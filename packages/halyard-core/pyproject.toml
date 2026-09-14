@@ -1,14 +1,14 @@
 [project]
 name = "halyard-core"
 version = "0.1.0"
-description = "Halyard core - DI, actions/providers, tenancy, observability primitives"
+description = "Halyard core"
 readme = "README.md"
-requires-python = ">=3.14"
-license = { text = "Proprietary" }
+requires-python = ">=3.11"
+license = "Apache-2.0"
 authors = [{ name = "allcupsnotinprivate" }]
 dependencies = [
-    "pydantic>=2.9",
-    "pydantic-settings>=2.5",
+    "anyio>=4",
+    "pydantic>=2.7,<3",
 ]
 
 [build-system]
