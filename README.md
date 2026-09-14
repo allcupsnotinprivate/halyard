@@ -6,6 +6,11 @@ Repository — **uv-workspace** (monorepo): the root is not published and holds 
 `uv.lock` and dev tooling, while the framework itself is distributed across
 `halyard.*` namespace packages within `packages/`.
 
+## Requirements
+
+- Python 3.14 (see `.python-version`)
+- [uv](https://docs.astral.sh/uv/)
+
 ## Structure
 
 ```
@@ -21,11 +26,6 @@ halyard/
 All packages use the shared import namespace `halyard.<subpackage>` (PEP 420);
 thus, `halyard-core` provides `halyard.core`, `halyard-<example>` provides `halyard.<example>`,
 and so on. Internal dependencies are resolved from the workspace (`tool.uv.sources`).
-
-## Requirements
-
-- Python 3.14 (see `.python-version`)
-- [uv](https://docs.astral.sh/uv/)
 
 ## Quick Start
 
