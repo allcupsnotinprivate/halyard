@@ -26,8 +26,8 @@ jobs:
           uv run ruff format --check .
       - name: Type-check
         run: uv run --all-packages mypy $(find packages -maxdepth 3 -name src -type d)
-      - name: Tests
-        run: uv run pytest
+      - name: Tests (coverage gate 90%)
+        run: uv run pytest --cov=halyard.core --cov-report=term
 
   wheel-smoke:
     name: wheel installs into clean venv
