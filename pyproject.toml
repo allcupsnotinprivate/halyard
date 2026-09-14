@@ -1,0 +1,92 @@
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv]
+managed = true
+
+[tool.uv.sources]
+halyard-core = { workspace = true }
+halyard-fastapi = { workspace = true }
+halyard-litestar = { workspace = true }
+halyard-redis = { workspace = true }
+halyard-mcp = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.11",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=6.2.1",
+    "pre-commit>=4.5.1",
+    "halyard-core",
+]
+
+# --------------------------------------------------------------------------
+# ruff (shared across entire workspace)
+# --------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py314"
+fix = true
+output-format = "grouped"
+exclude = [".venv"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "S"]
+extend-select = ["I", "TID252", "UP", "RUF100", "PIE", "C4", "SIM"]
+ignore = ["B008", "B904"]
+extend-unsafe-fixes = ["F401"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["halyard"]
+force-sort-within-sections = true
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+# --------------------------------------------------------------------------
+# mypy (general; specific packages are passed explicitly, see pre-commit)
+# --------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["pydantic.mypy"]
+namespace_packages = true
+explicit_package_bases = true
+exclude = ['/tests/', '/generated/']
+
+[[tool.mypy.overrides]]
+module = ["langfuse.*", "litellm.*", "mcp.*"]
+ignore_missing_imports = true
+
+# --------------------------------------------------------------------------
+# pytest / coverage (run from the root; tests are located in packages/*/tests)
+# --------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers --import-mode=importlib"
+testpaths = ["packages"]
+markers = [
+    "unit: isolated unit tests",
+    "integration: integration tests against real dependencies",
+    "e2e: end-to-end tests against a running service",
+]
+filterwarnings = []
+
+[tool.coverage.run]
+branch = true
+omit = ["*/__init__.py", "*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
