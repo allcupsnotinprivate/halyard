@@ -1,6 +1,5 @@
-from importlib.metadata import PackageNotFoundError, version
+"""Halyard core: foundation and interceptor pipeline"""
 
-try:
-    __version__ = version("halyard-core")
-except PackageNotFoundError:
-    __version__ = "0.0.0"
+from importlib.metadata import version
+
+__version__ = version("halyard-core")
