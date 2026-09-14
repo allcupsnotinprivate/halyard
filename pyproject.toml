@@ -58,6 +58,8 @@ strict = true
 plugins = ["pydantic.mypy"]
 namespace_packages = true
 explicit_package_bases = true
+# Each workspace member's src is a package base; append new members here.
+mypy_path = ["packages/halyard-core/src"]
 exclude = ['/tests/']
 
 # --------------------------------------------------------------------------
