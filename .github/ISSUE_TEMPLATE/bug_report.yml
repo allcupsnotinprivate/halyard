@@ -1,0 +1,58 @@
+name: 🐞 Bug report
+description: Report a malfunction
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Please fill in the fields below—this will speed up the review process.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the problem and the actual behavior.
+      placeholder: When X is launched, Y happens...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What was supposed to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal sequence of actions.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS, version of project/commit, relevant dependencies.
+      placeholder: |
+        - Python: 3.14
+        - OS: macOS 15
+        - Commit: abc1234
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste relevant logs or the error (will be formatted as code).
+      render: shell
+    validations:
+      required: false
