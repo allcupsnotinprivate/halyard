@@ -21,11 +21,6 @@ class ProfilesSettings(BaseModel):
 
 
 class Profiles(AComponent[ProfilesSettings, str, dict]):
-    name = "profiles"
-
-    def endpoint(self) -> str | None:
-        return self.settings.base_url  # breaker/concurrency slice by host
-
     async def start(self) -> None:
         self._client = make_client(self.settings.base_url)  # your real client
 
@@ -39,7 +34,28 @@ class Profiles(AComponent[ProfilesSettings, str, dict]):
         return resp.json()
 ```
 
-That is the whole component. Notice it says nothing about retries or caching.
+That is the whole component: it says nothing about retries or caching, and even
+the name is derived (`Profiles` → `"profiles"`; set `name = "..."` to override).
+
+Everything else is **opt-in**, added only when you need it:
+
+- `endpoint()` - return the resolved host when several instances talk to the
+  same system and should *share* breaker/concurrency state; by default each
+  instance keeps its own.
+- a typed dependency - annotate an attribute with another component's type and
+  the container injects the live instance:
+
+  ```python
+  class Search(AComponent[SearchSettings, str, list[dict]]):
+      profiles: Profiles  # dependency, injected at start
+
+      @invocable
+      async def find(self, user_id: str) -> list[dict]:
+          owner = await self.profiles.get(user_id)  # typed, no strings
+          ...
+  ```
+- `criticality`, `lifetime`/`scope`, `defaults`, `version` - see
+  [composition.md](composition.md).
 
 ## 2. Turn on resilience with config
 
@@ -72,6 +88,13 @@ await container.start()
 
 outcome = await container.invoke("profiles", "get", user_id="42")
 print(outcome.value, outcome.source)  # second identical call -> source == "cache"
+
+# Typed alternative to string-based invoke - same chain underneath:
+profiles = container.proxy(Profiles)
+data = await profiles.get(user_id="42")  # keyword args; returns the value
+
+# Raw instance (no retry/breaker/telemetry!) - for advanced wiring only:
+raw = await container.get(Profiles)
 
 await container.stop()
 ```

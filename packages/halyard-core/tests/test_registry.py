@@ -85,12 +85,22 @@ def test_unknown_component_is_a_configuration_error() -> None:
 def test_registering_an_invalid_component_fails_fast() -> None:
     reg = Registry()
 
-    class Nameless(AComponent[EmptySettings, None, None]):
+    class NoEntryPoints(AComponent[EmptySettings, None, None]):
+        pass  # no @invocable methods
+
+    with pytest.raises(ValueError, match="no @invocable"):
+        reg.register(NoEntryPoints)
+
+
+def test_auto_named_component_registers_under_the_derived_name() -> None:
+    reg = Registry()
+
+    class AutoNamed(AComponent[EmptySettings, None, None]):
         @invocable
         async def go(self) -> None: ...
 
-    with pytest.raises(ValueError, match="name"):
-        reg.register(Nameless)
+    reg.register(AutoNamed)
+    assert reg.get("auto_named") is AutoNamed
 
 
 def test_two_registries_are_independent() -> None:
