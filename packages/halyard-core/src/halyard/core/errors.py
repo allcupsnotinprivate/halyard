@@ -33,6 +33,14 @@ class AttemptTimeout(TransientError):
     """A single attempt ran out of its per-attempt time budget."""
 
 
+class CircuitOpen(TransientError):
+    """The circuit breaker is open; the call was rejected without being tried.
+
+    Transient on purpose: an outer retry (if any) may legitimately back off and
+    try again once the breaker allows a probe.
+    """
+
+
 class RetryExhausted(TransientError):
     """Every retry attempt was spent; wraps the last underlying failure.
 
