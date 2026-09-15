@@ -15,8 +15,7 @@ that talk to the same endpoint.
 from collections.abc import Mapping
 import contextlib
 from dataclasses import dataclass
-import inspect
-from typing import Any, get_type_hints
+from typing import Any
 import uuid
 
 import anyio
@@ -38,7 +37,7 @@ from halyard.core.errors import (
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor
 from halyard.core.pipeline.builtin.concurrency import ConcurrencyInterceptor
-from halyard.core.pipeline.chain import DEFAULT_ORDER, build_chain
+from halyard.core.pipeline.chain import build_chain
 from halyard.core.pipeline.interceptor import Next
 from halyard.core.pipeline.state import InMemoryStateStore
 from halyard.core.telemetry.instrument import DEFAULT_CONFIG, TelemetryConfig, instrument
@@ -62,8 +61,8 @@ from .introspection import (
     MethodExplanation,
     RuntimeSnapshot,
 )
-from .links import BUILTIN_LINK_BUILDERS
 from .registry import Registry
+from .wiring import active_links, make_base, method_factories
 
 
 def _first_leaf(exc: BaseException) -> BaseException:
@@ -363,35 +362,10 @@ class Container:
         settings = own.model_validate(config.model_dump(exclude={POLICY_FIELD}))
         return reg.cls(settings), config
 
-    def _active_links(self, name: str, method: str, config: BaseModel) -> list[tuple[str, BaseModel]]:
-        """The (link name, settings) pairs active for a method, outermost first.
-
-        Order comes from the config's chain; the method's effective policy
-        restricts which links are allowed (so e.g. health, pinned to
-        ("timeout",), is never retried even if the config lists retry); a link
-        is active only when it is implemented and has settings.
-        """
-        spec = self._registrations[name].descriptor.invocables[method]
-        config_policy = getattr(config, POLICY_FIELD, None)
-        config_chain = getattr(config_policy, "chain", None) or DEFAULT_ORDER
-        allowed = set(spec.policy.chain)
-        result: list[tuple[str, BaseModel]] = []
-        for link in config_chain:
-            if link not in allowed or BUILTIN_LINK_BUILDERS.get(link) is None:
-                continue
-            settings = self._link_settings(config, link, spec.policy.overrides.get(link, {}))
-            if settings is None:
-                continue
-            result.append((link, settings))
-        return result
-
     def _build_chain(self, instance: AComponent[Any, Any, Any], name: str, method: str, config: BaseModel) -> Next:
         spec = self._registrations[name].descriptor.invocables[method]
-        factories = [
-            BUILTIN_LINK_BUILDERS[link](settings, self._clock, self._classifier)
-            for link, settings in self._active_links(name, method, config)
-        ]
-        base = self._make_base(instance, spec.method_name)
+        factories = method_factories(config, spec.policy, self._clock, self._classifier)
+        base = make_base(instance, spec.method_name)
         chain = build_chain(factories, self._link_store, self._axes, base)
         return instrument(
             chain,
@@ -400,34 +374,6 @@ class Container:
             meter_provider=self._meter_provider,
             config=self._telemetry,
         )
-
-    @staticmethod
-    def _link_settings(config: BaseModel, link: str, override: Mapping[str, Any]) -> BaseModel | None:
-        policy = getattr(config, POLICY_FIELD, None)
-        base: BaseModel | None = getattr(policy, link, None) if policy is not None else None
-        if base is None:
-            return None
-        if not override:
-            return base
-        merged = {**base.model_dump(), **override}
-        return type(base).model_validate(merged)
-
-    def _make_base(self, instance: AComponent[Any, Any, Any], method_name: str) -> Next:
-        method = getattr(instance, method_name)
-        hints = get_type_hints(method)
-        ctx_param = next(
-            (name for name in inspect.signature(method).parameters if hints.get(name) is InvocationContext),
-            None,
-        )
-
-        async def base(ctx: InvocationContext) -> Outcome[Any]:
-            kwargs = dict(ctx.arguments or {})
-            if ctx_param is not None:
-                kwargs[ctx_param] = ctx
-            result = await method(**kwargs)
-            return result if isinstance(result, Outcome) else Outcome(value=result)
-
-        return base
 
     # --- health --------------------------------------------------------------
 
@@ -465,7 +411,8 @@ class Container:
         if method not in reg.descriptor.invocables:
             raise ConfigurationError(f"component '{component}' has no invocable '{method}'")
         config = self._assemble(component, scope_key)
-        chain = tuple(link for link, _ in self._active_links(component, method, config))
+        spec = reg.descriptor.invocables[method]
+        chain = tuple(link for link, _ in active_links(config, spec.policy))
         provenance = dict(self._provenance_cache.get((component, scope_key), {}))
         return MethodExplanation(component=component, method=method, chain=chain, provenance=provenance)
 
