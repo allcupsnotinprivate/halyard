@@ -3,7 +3,13 @@
 import pytest
 
 from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext, current_context, use_context
+from halyard.core.context import (
+    InvocationContext,
+    current_context,
+    current_correlation_id,
+    use_context,
+    use_correlation_id,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -131,3 +137,14 @@ def test_current_context_helpers() -> None:
             assert current_context() is inner
         assert current_context() is c
     assert current_context() is None
+
+
+def test_correlation_id_contextvar() -> None:
+    assert current_correlation_id() is None
+    with use_correlation_id("req-1") as bound:
+        assert bound == "req-1"
+        assert current_correlation_id() == "req-1"
+        with use_correlation_id("req-2"):
+            assert current_correlation_id() == "req-2"
+        assert current_correlation_id() == "req-1"
+    assert current_correlation_id() is None

@@ -26,7 +26,7 @@ from halyard.core.axes import GLOBAL_SCOPE, AxisRegistry, ScopeKey
 from halyard.core.clock import Clock, SystemClock
 from halyard.core.component import AComponent, Criticality, Descriptor, HealthStatus, Lifetime
 from halyard.core.component.settings import POLICY_FIELD
-from halyard.core.context import InvocationContext, use_context
+from halyard.core.context import InvocationContext, current_correlation_id, use_context
 from halyard.core.errors import (
     ComponentUnavailable,
     ConfigurationError,
@@ -77,17 +77,18 @@ def _first_leaf(exc: BaseException) -> BaseException:
 class _InvokeProxy:
     """Typed facade over ``Container.invoke`` for one component."""
 
-    def __init__(self, container: "Container", name: str, methods: frozenset[str]) -> None:
+    def __init__(self, container: "Container", name: str, methods: frozenset[str], budget: float | None) -> None:
         self._container = container
         self._name = name
         self._methods = methods
+        self._budget = budget
 
     def __getattr__(self, item: str) -> Callable[..., Coroutine[Any, Any, Any]]:
         if item not in self._methods:
             raise AttributeError(f"component '{self._name}' has no invocable '{item}'")
 
         async def call(**arguments: Any) -> Any:
-            outcome = await self._container.invoke(self._name, item, **arguments)
+            outcome = await self._container.invoke(self._name, item, budget=self._budget, **arguments)
             return outcome.value
 
         return call
@@ -289,9 +290,21 @@ class Container:
     # --- invocation ----------------------------------------------------------
 
     async def invoke(
-        self, component: str, method: str, *, correlation_id: str | None = None, **arguments: Any
+        self,
+        component: str,
+        method: str,
+        *,
+        correlation_id: str | None = None,
+        budget: float | None = None,
+        **arguments: Any,
     ) -> Outcome[Any]:
-        """Invoke a component's method through its policy chain and telemetry."""
+        """Invoke a component's method through its policy chain and telemetry.
+
+        ``correlation_id`` defaults to the ambient one (see
+        :func:`use_correlation_id`), then a fresh id. ``budget`` sets an overall
+        deadline of ``budget`` seconds for the whole call (retries included);
+        the per-attempt timeout link still bounds each attempt.
+        """
         if not self._started:
             raise ConfigurationError("container is not started")
         reg = self._registration(component)
@@ -310,7 +323,8 @@ class Container:
 
         ctx = InvocationContext(
             operation=f"{component}.{method}",
-            correlation_id=correlation_id or uuid.uuid4().hex,
+            correlation_id=correlation_id or current_correlation_id() or uuid.uuid4().hex,
+            deadline=None if budget is None else self._clock.monotonic() + budget,
             arguments=dict(arguments),
             scope_key=scope_key,
             clock=self._clock,
@@ -449,7 +463,7 @@ class Container:
         scoped, _ = await self._scoped_instance(name)
         return cast("C", scoped)
 
-    def proxy(self, ref: "type[C] | str") -> "C":
+    def proxy(self, ref: "type[C] | str", *, budget: float | None = None) -> "C":
         """A typed facade whose invocable methods run through the full chain.
 
         Each ``@invocable`` method becomes ``await proxy.method(**kwargs)`` -
@@ -457,11 +471,12 @@ class Container:
         with the component's signatures for the type checker. Methods take
         keyword arguments only and return the outcome's **value**; use
         :meth:`invoke` when you need the full :class:`Outcome` (e.g. the
-        ``degraded`` flag).
+        ``degraded`` flag). ``budget`` applies an overall deadline to every call
+        made through the proxy.
         """
         name = ref if isinstance(ref, str) else ref.name
         reg = self._registration(name)
-        return cast("C", _InvokeProxy(self, name, frozenset(reg.descriptor.invocables)))
+        return cast("C", _InvokeProxy(self, name, frozenset(reg.descriptor.invocables), budget))
 
     # --- introspection -------------------------------------------------------
 

@@ -111,3 +111,25 @@ def use_context(ctx: InvocationContext) -> Iterator[InvocationContext]:
         yield ctx
     finally:
         _current.reset(token)
+
+
+_correlation_id: ContextVar[str | None] = ContextVar("halyard_correlation_id", default=None)
+
+
+def current_correlation_id() -> str | None:
+    """Return the ambient correlation id, if one is bound (see :func:`use_correlation_id`)."""
+    return _correlation_id.get()
+
+
+@contextmanager
+def use_correlation_id(correlation_id: str) -> Iterator[str]:
+    """Bind a correlation id so calls in this block inherit it without passing it.
+
+    A caller (a web request, a worker task) sets it once; every invocation made
+    inside the block uses it unless one is passed explicitly.
+    """
+    token = _correlation_id.set(correlation_id)
+    try:
+        yield correlation_id
+    finally:
+        _correlation_id.reset(token)

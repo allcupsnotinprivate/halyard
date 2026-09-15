@@ -189,6 +189,22 @@ async def test_snapshot_reports_breaker_and_concurrency_state() -> None:
     await container.stop()
 
 
+async def test_snapshot_ignores_links_that_are_neither_breaker_nor_concurrency() -> None:
+    reg = Registry()
+    reg.register(Svc)
+    # Only cache configured: the link store holds a cache interceptor, which the
+    # snapshot walks past without reporting.
+    config = {"svc": {"policy": {"cache": {"ttl": 100.0, "max_entries": 10}}}}
+    container = Container.build(reg, config)
+    await container.start()
+    await container.invoke("svc", "go")
+
+    snap = container.snapshot()
+    assert snap.breakers == ()
+    assert snap.concurrency == ()
+    await container.stop()
+
+
 async def test_snapshot_lists_live_scoped_slices() -> None:
     reg = Registry()
     reg.register(TenantSvc)
