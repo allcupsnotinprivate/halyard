@@ -78,6 +78,12 @@ async def main() -> None:
     print(f"  attempts = {outcome.attempts} (first attempt failed, retry recovered)")
     print(f"  source   = {outcome.source}")
 
+    explanation = container.explain("search", "query")
+    print("\nexplain search.query:")
+    print(f"  chain      = {explanation.chain}")
+    print(f"  provenance = {dict(explanation.provenance)}")
+    print(f"  breakers   = {container.snapshot().breakers}")
+
     await container.stop()
     print("\nstopped")
 

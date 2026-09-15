@@ -7,7 +7,7 @@ import anyio
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 import pytest
 
 from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
@@ -161,7 +161,7 @@ async def test_build_rejects_unknown_component() -> None:
 
 
 async def test_build_validates_config_against_the_model() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ConfigurationError, match="component 'echo' at 'prefix'"):
         Container.build(fresh_registry(), {"echo": {}})  # missing required 'prefix'
 
 

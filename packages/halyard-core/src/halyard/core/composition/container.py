@@ -23,7 +23,7 @@ import anyio
 import anyio.lowlevel
 from pydantic import BaseModel
 
-from halyard.core.axes import AxisRegistry, ScopeKey
+from halyard.core.axes import GLOBAL_SCOPE, AxisRegistry, ScopeKey
 from halyard.core.clock import Clock, SystemClock
 from halyard.core.component import AComponent, Criticality, Descriptor, HealthStatus, Lifetime
 from halyard.core.component.settings import POLICY_FIELD
@@ -36,14 +36,32 @@ from halyard.core.errors import (
     StartupError,
 )
 from halyard.core.outcome import Outcome
+from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor
+from halyard.core.pipeline.builtin.concurrency import ConcurrencyInterceptor
 from halyard.core.pipeline.chain import DEFAULT_ORDER, build_chain
 from halyard.core.pipeline.interceptor import Next
 from halyard.core.pipeline.state import InMemoryStateStore
 from halyard.core.telemetry.instrument import DEFAULT_CONFIG, TelemetryConfig, instrument
 
+from .config import (
+    SOURCE_COMPONENT,
+    SOURCE_DEPLOYMENT,
+    SOURCE_FRAMEWORK,
+    SOURCE_SLICE,
+    DictSettingsResolver,
+    Provenance,
+    SettingsResolver,
+    assemble_config,
+)
 from .endpoint import endpoint_axis, use_endpoint
 from .graph import DependencyGraph, GraphNode
 from .health import Readiness, aggregate_readiness
+from .introspection import (
+    BreakerSnapshot,
+    ConcurrencySnapshot,
+    MethodExplanation,
+    RuntimeSnapshot,
+)
 from .links import BUILTIN_LINK_BUILDERS
 from .registry import Registry
 
@@ -60,7 +78,7 @@ class _Registration:
     name: str
     cls: type[AComponent[Any, Any, Any]]
     descriptor: Descriptor
-    config: BaseModel
+    deployment: Mapping[str, Any]
 
 
 class Container:
@@ -77,6 +95,8 @@ class Container:
         tracer_provider: Any,
         meter_provider: Any,
         telemetry: TelemetryConfig,
+        framework_defaults: Mapping[str, Any],
+        resolver: SettingsResolver,
         init_timeout: float,
         drain_timeout: float,
         health_timeout: float,
@@ -87,6 +107,10 @@ class Container:
         self._clock = clock
         self._classifier = classifier
         self._axes = axes
+        self._framework_defaults = framework_defaults
+        self._resolver = resolver
+        self._config_cache: dict[tuple[str, ScopeKey], BaseModel] = {}
+        self._provenance_cache: dict[tuple[str, ScopeKey], Provenance] = {}
         self._tracer_provider = tracer_provider
         self._meter_provider = meter_provider
         self._telemetry = telemetry
@@ -116,13 +140,22 @@ class Container:
         tracer_provider: Any = None,
         meter_provider: Any = None,
         telemetry: TelemetryConfig = DEFAULT_CONFIG,
+        framework_defaults: Mapping[str, Any] | None = None,
+        resolver: SettingsResolver | None = None,
         init_timeout: float = 30.0,
         drain_timeout: float = 30.0,
         health_timeout: float = 5.0,
         scoped_max_entries: int = 1000,
     ) -> "Container":
-        """Validate configs and the dependency graph; return an unstarted container."""
+        """Validate configs and the dependency graph; return an unstarted container.
+
+        Deployment config is validated eagerly (framework + component defaults +
+        deployment); per-slice overrides are applied and re-validated per
+        instance. Required fields must come from the deployment config - a slice
+        override tunes existing fields, it does not supply missing ones.
+        """
         axes = axes or AxisRegistry()
+        framework_defaults = framework_defaults or {}
         with contextlib.suppress(ConfigurationError):
             axes.register(endpoint_axis())  # tolerate a caller-registered endpoint axis
 
@@ -130,8 +163,17 @@ class Container:
         for name, raw in configs.items():
             component_cls = registry.get(name)
             descriptor = registry.descriptor(name)
-            config = descriptor.config_model.model_validate(dict(raw))
-            registrations[name] = _Registration(name, component_cls, descriptor, config)
+            # Fail fast on deployment errors (without the per-slice layer).
+            assemble_config(
+                name,
+                descriptor.config_model,
+                [
+                    (SOURCE_FRAMEWORK, framework_defaults),
+                    (SOURCE_COMPONENT, component_cls.defaults),
+                    (SOURCE_DEPLOYMENT, dict(raw)),
+                ],
+            )
+            registrations[name] = _Registration(name, component_cls, descriptor, dict(raw))
 
         graph = DependencyGraph(
             {
@@ -148,6 +190,8 @@ class Container:
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
             telemetry=telemetry,
+            framework_defaults=framework_defaults,
+            resolver=resolver or DictSettingsResolver(),
             init_timeout=init_timeout,
             drain_timeout=drain_timeout,
             health_timeout=health_timeout,
@@ -177,13 +221,14 @@ class Container:
 
         for name, reg in self._registrations.items():
             if reg.descriptor.lifetime is Lifetime.PROCESS and name in self._process:
+                config = self._assemble(name, GLOBAL_SCOPE)
                 for method in reg.descriptor.invocables:
-                    self._process_chains[(name, method)] = self._build_chain(self._process[name], reg, method)
+                    self._process_chains[(name, method)] = self._build_chain(self._process[name], name, method, config)
         self._started = True
 
     async def _start_process(self, name: str) -> None:
         reg = self._registrations[name]
-        instance = self._construct(reg)
+        instance, _ = self._instantiate(name, GLOBAL_SCOPE)
         instance.bind_dependencies({d: self._process[d] for d in reg.descriptor.dependencies if d in self._process})
         try:
             with anyio.fail_after(self._init_timeout):
@@ -238,7 +283,7 @@ class Container:
             scope_key: ScopeKey = (("component", component),)
         else:
             instance, scope_key = await self._scoped_instance(component)
-            chain = self._build_chain(instance, reg, method)
+            chain = self._build_chain(instance, component, method, self._assemble(component, scope_key))
 
         ctx = InvocationContext(
             operation=f"{component}.{method}",
@@ -262,7 +307,7 @@ class Container:
         store = self._scoped_stores[component]
 
         def factory() -> AComponent[Any, Any, Any]:
-            instance = self._construct(reg)
+            instance, _ = self._instantiate(component, scope_key)
             instance.bind_dependencies(deps)
             return instance
 
@@ -289,33 +334,63 @@ class Container:
         except KeyError:
             raise ConfigurationError(f"component '{component}' is not configured") from None
 
-    def _construct(self, reg: _Registration) -> AComponent[Any, Any, Any]:
+    def _assemble(self, name: str, scope_key: ScopeKey) -> BaseModel:
+        """Merge the four config layers for an instance and cache the result."""
+        cached = self._config_cache.get((name, scope_key))
+        if cached is not None:
+            return cached
+        reg = self._registrations[name]
+        config, provenance = assemble_config(
+            name,
+            reg.descriptor.config_model,
+            [
+                (SOURCE_FRAMEWORK, self._framework_defaults),
+                (SOURCE_COMPONENT, reg.cls.defaults),
+                (SOURCE_DEPLOYMENT, reg.deployment),
+                (SOURCE_SLICE, dict(self._resolver.resolve(name, scope_key))),
+            ],
+        )
+        self._config_cache[(name, scope_key)] = config
+        self._provenance_cache[(name, scope_key)] = provenance
+        return config
+
+    def _instantiate(self, name: str, scope_key: ScopeKey) -> tuple[AComponent[Any, Any, Any], BaseModel]:
+        reg = self._registrations[name]
+        config = self._assemble(name, scope_key)
         own = reg.descriptor.settings_model
         if own is None:
-            return reg.cls(reg.config)
-        settings = own.model_validate(reg.config.model_dump(exclude={POLICY_FIELD}))
-        return reg.cls(settings)
+            return reg.cls(config), config
+        settings = own.model_validate(config.model_dump(exclude={POLICY_FIELD}))
+        return reg.cls(settings), config
 
-    def _build_chain(self, instance: AComponent[Any, Any, Any], reg: _Registration, method: str) -> Next:
-        spec = reg.descriptor.invocables[method]
-        # Order comes from the deployment config's chain; the method's effective
-        # policy restricts which links are allowed (so e.g. health, pinned to
-        # ("timeout",), is never retried even if the config lists retry); a link
-        # is active only when it also has settings.
-        config_policy = getattr(reg.config, POLICY_FIELD, None)
+    def _active_links(self, name: str, method: str, config: BaseModel) -> list[tuple[str, BaseModel]]:
+        """The (link name, settings) pairs active for a method, outermost first.
+
+        Order comes from the config's chain; the method's effective policy
+        restricts which links are allowed (so e.g. health, pinned to
+        ("timeout",), is never retried even if the config lists retry); a link
+        is active only when it is implemented and has settings.
+        """
+        spec = self._registrations[name].descriptor.invocables[method]
+        config_policy = getattr(config, POLICY_FIELD, None)
         config_chain = getattr(config_policy, "chain", None) or DEFAULT_ORDER
         allowed = set(spec.policy.chain)
-        factories = []
+        result: list[tuple[str, BaseModel]] = []
         for link in config_chain:
-            if link not in allowed:
+            if link not in allowed or BUILTIN_LINK_BUILDERS.get(link) is None:
                 continue
-            builder = BUILTIN_LINK_BUILDERS.get(link)
-            if builder is None:
-                continue  # a link named in the chain but not implemented yet
-            settings = self._link_settings(reg.config, link, spec.policy.overrides.get(link, {}))
+            settings = self._link_settings(config, link, spec.policy.overrides.get(link, {}))
             if settings is None:
-                continue  # link not configured for this component: inactive
-            factories.append(builder(settings, self._clock, self._classifier))
+                continue
+            result.append((link, settings))
+        return result
+
+    def _build_chain(self, instance: AComponent[Any, Any, Any], name: str, method: str, config: BaseModel) -> Next:
+        spec = self._registrations[name].descriptor.invocables[method]
+        factories = [
+            BUILTIN_LINK_BUILDERS[link](settings, self._clock, self._classifier)
+            for link, settings in self._active_links(name, method, config)
+        ]
         base = self._make_base(instance, spec.method_name)
         chain = build_chain(factories, self._link_store, self._axes, base)
         return instrument(
@@ -383,6 +458,43 @@ class Container:
             return HealthStatus.unhealthy("health check failed")
 
     # --- introspection -------------------------------------------------------
+
+    def explain(self, component: str, method: str, *, scope_key: ScopeKey = GLOBAL_SCOPE) -> MethodExplanation:
+        """Show a method's effective link chain and where each setting came from."""
+        reg = self._registration(component)
+        if method not in reg.descriptor.invocables:
+            raise ConfigurationError(f"component '{component}' has no invocable '{method}'")
+        config = self._assemble(component, scope_key)
+        chain = tuple(link for link, _ in self._active_links(component, method, config))
+        provenance = dict(self._provenance_cache.get((component, scope_key), {}))
+        return MethodExplanation(component=component, method=method, chain=chain, provenance=provenance)
+
+    def resolved_settings(self, component: str, *, scope_key: ScopeKey = GLOBAL_SCOPE) -> Mapping[str, Any]:
+        """The fully resolved config of an instance as a plain mapping."""
+        self._registration(component)
+        return self._assemble(component, scope_key).model_dump()
+
+    def snapshot(self) -> RuntimeSnapshot:
+        """A point-in-time view of breaker states, concurrency and live slices."""
+        breakers: list[BreakerSnapshot] = []
+        concurrency: list[ConcurrencySnapshot] = []
+        for key, instance in self._link_store.items():
+            unit = key[0][1] if key and key[0][0] == "__unit__" else "?"
+            slice_key = key[1:]
+            if isinstance(instance, CircuitBreakerInterceptor):
+                breakers.append(BreakerSnapshot(unit=unit, slice=slice_key, state=instance.state.value))
+            elif isinstance(instance, ConcurrencyInterceptor):
+                concurrency.append(
+                    ConcurrencySnapshot(
+                        unit=unit,
+                        slice=slice_key,
+                        outer_limit=instance.outer_limit,
+                        outer_available=instance.outer_available,
+                        inner_slices=instance.inner_slice_count,
+                    )
+                )
+        live_slices = {name: tuple(store.keys()) for name, store in self._scoped_stores.items()}
+        return RuntimeSnapshot(tuple(breakers), tuple(concurrency), live_slices)
 
     @property
     def started(self) -> bool:
