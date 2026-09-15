@@ -10,6 +10,7 @@ from halyard.core.errors import (
     ErrorClass,
     FrameworkError,
     PermanentError,
+    RetryExhausted,
     TransientError,
 )
 
@@ -24,6 +25,15 @@ def test_hierarchy() -> None:
     assert issubclass(ConfigurationError, PermanentError)
     assert issubclass(DeadlineExceeded, TransientError)
     assert issubclass(AttemptTimeout, TransientError)
+    assert issubclass(RetryExhausted, TransientError)
+
+
+def test_retry_exhausted_carries_context() -> None:
+    cause = TransientError("last")
+    err = RetryExhausted("gave up", attempts=3, last_error=cause)
+    assert err.attempts == 3
+    assert err.last_error is cause
+    assert classifier.classify(err) == ErrorClass.TRANSIENT
 
 
 @pytest.mark.parametrize(

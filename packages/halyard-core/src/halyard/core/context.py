@@ -9,7 +9,7 @@ agree on (deadline, attempt number, shared facts) travels in the context.
     shared. Pass the context explicitly when crossing thread boundaries.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -33,20 +33,57 @@ class InvocationContext:
     deadline: float | None = None
     attempt: int = 1
     scope_key: ScopeKey = GLOBAL_SCOPE
+    #: Bound call arguments (parameter name -> value), the input a link such as
+    #: cache keys on. ``None`` until a caller populates it; the mapping itself
+    #: is read-only to links.
+    arguments: Mapping[str, Any] | None = None
+    #: Clock that interprets ``deadline``. Optional so a plain context still
+    #: works, but when set it lets the base call and links read the remaining
+    #: budget without threading a clock through by hand.
+    clock: Clock | None = None
     bag: dict[str, Any] = field(default_factory=dict)
 
-    def remaining(self, clock: Clock) -> float | None:
+    @classmethod
+    def start(
+        cls,
+        operation: str,
+        correlation_id: str,
+        *,
+        clock: Clock,
+        budget: float | None = None,
+        **fields: Any,
+    ) -> "InvocationContext":
+        """Build a fresh context, deriving an absolute deadline from ``budget``.
+
+        ``budget`` is a relative number of seconds; the stored deadline is
+        ``clock.monotonic() + budget``. The clock is retained so
+        :meth:`remaining` and :meth:`expired` can be called without one.
+        """
+        deadline = None if budget is None else clock.monotonic() + budget
+        return cls(operation=operation, correlation_id=correlation_id, deadline=deadline, clock=clock, **fields)
+
+    def _clock(self, clock: Clock | None) -> Clock:
+        chosen = clock if clock is not None else self.clock
+        if chosen is None:
+            raise ValueError("no clock available: pass one or build the context with a clock")
+        return chosen
+
+    def remaining(self, clock: Clock | None = None) -> float | None:
         """Seconds left until the deadline; ``None`` when there is no deadline.
 
-        Never negative: an expired deadline yields ``0.0``.
+        Uses the context's own clock when ``clock`` is omitted. Never negative:
+        an expired deadline yields ``0.0``.
         """
         if self.deadline is None:
             return None
-        return max(self.deadline - clock.monotonic(), 0.0)
+        return max(self.deadline - self._clock(clock).monotonic(), 0.0)
 
-    def expired(self, clock: Clock) -> bool:
-        """Whether the overall deadline has already passed."""
-        return self.deadline is not None and clock.monotonic() >= self.deadline
+    def expired(self, clock: Clock | None = None) -> bool:
+        """Whether the overall deadline has already passed.
+
+        Uses the context's own clock when ``clock`` is omitted.
+        """
+        return self.deadline is not None and self._clock(clock).monotonic() >= self.deadline
 
     def child(self, **overrides: Any) -> "InvocationContext":
         """Derive a context for a new attempt (or any other override).

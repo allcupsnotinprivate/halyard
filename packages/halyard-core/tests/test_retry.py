@@ -14,7 +14,7 @@ import pytest
 
 from halyard.core.clock import ManualClock
 from halyard.core.context import InvocationContext
-from halyard.core.errors import DeadlineExceeded, ErrorClass, PermanentError, TransientError
+from halyard.core.errors import DeadlineExceeded, ErrorClass, PermanentError, RetryExhausted, TransientError
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.builtin.retry import RetryFactory, RetryInterceptor, RetrySettings
 from halyard.core.pipeline.interceptor import Next
@@ -109,6 +109,20 @@ async def test_attempt_limit_is_respected() -> None:
         await make_retry(clock, attempts=3).call(flaky, ctx())
     assert flaky.calls == 3
     assert len(clock.sleeps) == 2  # no sleep after the final failure
+
+
+async def test_exhausted_retry_wraps_last_error_in_framework_error() -> None:
+    clock = RecordingClock()
+    flaky = Flaky(failures=100)
+    with pytest.raises(RetryExhausted) as excinfo:
+        await make_retry(clock, attempts=3).call(flaky, ctx())
+
+    err = excinfo.value
+    assert err.attempts == 3
+    assert isinstance(err.last_error, TransientError)
+    assert str(err.last_error) == "failure #3"
+    assert err.__cause__ is err.last_error  # original preserved for tracebacks
+    assert isinstance(err, TransientError)  # an outer retry could still act on it
 
 
 async def test_each_attempt_gets_child_context_and_parent_is_untouched() -> None:
