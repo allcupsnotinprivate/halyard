@@ -54,6 +54,21 @@ class ConcurrencyInterceptor:
         # once the pipeline is wired to instances.
         self._inner: dict[ScopeKey, anyio.Semaphore] = {}
 
+    @property
+    def outer_limit(self) -> int:
+        """Configured endpoint-wide concurrency cap (for introspection)."""
+        return self._settings.outer_limit
+
+    @property
+    def outer_available(self) -> int:
+        """Free slots on the endpoint-wide semaphore right now."""
+        return self._outer.value
+
+    @property
+    def inner_slice_count(self) -> int:
+        """Number of instance slices with a live inner semaphore."""
+        return len(self._inner)
+
     def _inner_for(self, key: ScopeKey) -> anyio.Semaphore:
         sem = self._inner.get(key)
         if sem is None:  # no await between get and set: safe without a lock

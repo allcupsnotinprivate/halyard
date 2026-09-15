@@ -29,9 +29,8 @@ outcome = await container.invoke("search", "query", text="halyard")
 await container.stop()
 ```
 
-Configuration is a `{component_name: config_dict}` mapping; each config is
-validated against that type's dynamic config model (own fields + `policy`).
-Multi-source config merging is a later concern - here the mapping is the source.
+The `configs` mapping is the deployment layer (see below); each assembled config
+is validated against that type's dynamic config model (own fields + `policy`).
 
 ## Dependency graph
 
@@ -71,6 +70,39 @@ single link store backs the container, `[endpoint]`-sliced state (circuit
 breaker, concurrency's outer limit) is shared by instances on the same endpoint
 and separated across different ones - with no component declaring it. Other axes
 (e.g. a tenant axis for scoped components) are registered by the application.
+
+## Layered configuration
+
+A component's config is merged from four sources, each overriding the previous
+**field by field** (never replacing a whole object):
+
+1. framework defaults (`Container.build(framework_defaults=...)`),
+2. the component author's defaults (`AComponent.defaults`),
+3. the deployment config (the `configs` mapping),
+4. the per-slice override, from a swappable `SettingsResolver` (production reads
+   a database, tests read a dict via `DictSettingsResolver`).
+
+The deployment layer is validated eagerly at build; per-slice overrides are
+applied and re-validated per instance, and their results are cached per
+`(component, scope_key)`. A slice override *tunes* existing fields - required
+fields must come from the deployment config.
+
+Merging records every leaf value's **provenance** (which source set it). A
+validation error therefore names the component, the full field path, and the
+source: `invalid config for component 'search' at 'policy.retry.attempts' (from
+slice override): Input should be greater than 0`.
+
+## Introspection
+
+The container answers the questions that otherwise mean reading the core:
+
+- `explain(component, method)` - the effective link chain for a method (after
+  config order and the method's policy filter) plus the provenance of every
+  config value.
+- `resolved_settings(component, scope_key=...)` - an instance's fully merged
+  config as a mapping.
+- `snapshot()` - live runtime state: each breaker's state, each concurrency
+  link's occupancy, and the live slice keys of scoped components.
 
 ## Health
 

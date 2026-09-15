@@ -55,6 +55,14 @@ class InMemoryStateStore:
     def __len__(self) -> int:
         return len(self._entries)
 
+    def items(self) -> list[tuple[ScopeKey, object]]:
+        """Snapshot of the live ``(key, instance)`` pairs (for introspection)."""
+        return list(self._entries.items())
+
+    def keys(self) -> list[ScopeKey]:
+        """Snapshot of the live keys, most-recently-used last."""
+        return list(self._entries)
+
     async def get_or_create(self, key: ScopeKey, factory: Callable[[], T]) -> T:
         async with self._lock:
             if self._closed:

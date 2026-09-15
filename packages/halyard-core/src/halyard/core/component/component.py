@@ -64,6 +64,8 @@ class AComponent(Generic[TSettings, TIn, TOut]):
     policy: ClassVar[Policy | None] = None
     #: Names of components this one depends on.
     dependencies: ClassVar[tuple[str, ...]] = ()
+    #: Author-provided default config, merged under the deployment config.
+    defaults: ClassVar[Mapping[str, Any]] = {}
     #: Whether the system may run without this component.
     criticality: ClassVar[Criticality] = Criticality.REQUIRED
     #: How many instances the container keeps.
