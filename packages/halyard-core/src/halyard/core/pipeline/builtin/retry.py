@@ -14,7 +14,13 @@ from pydantic import BaseModel, Field, model_validator
 from halyard.core.axes import EMPTY_SCOPE, ScopeKey, ScopeSpec
 from halyard.core.clock import Clock
 from halyard.core.context import InvocationContext
-from halyard.core.errors import DeadlineExceeded, DefaultErrorClassifier, ErrorClass, ErrorClassifier
+from halyard.core.errors import (
+    DeadlineExceeded,
+    DefaultErrorClassifier,
+    ErrorClass,
+    ErrorClassifier,
+    RetryExhausted,
+)
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
@@ -78,7 +84,14 @@ class RetryInterceptor:
                 if self._classifier.classify(exc) != self._settings.retry_on:
                     raise
                 if attempt == self._settings.attempts:
-                    raise
+                    # Retryable, but the attempt budget is spent: surface a
+                    # framework error wrapping the last failure, so the caller
+                    # never has to catch the client library's own exception.
+                    raise RetryExhausted(
+                        f"'{ctx.operation}' exhausted after {attempt} attempts: {exc}",
+                        attempts=attempt,
+                        last_error=exc,
+                    ) from exc
 
                 delay = self._delay_before(attempt + 1)
                 remaining = ctx.remaining(self._clock)

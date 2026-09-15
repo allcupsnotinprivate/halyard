@@ -74,6 +74,52 @@ def test_bag_can_be_isolated_explicitly() -> None:
     assert parent.bag["k"] == "v"
 
 
+def test_remaining_uses_the_contexts_own_clock() -> None:
+    clock = ManualClock()
+    c = ctx(deadline=10.0, clock=clock)
+    assert c.remaining() == 10.0
+    clock.advance(4)
+    assert c.remaining() == 6.0
+    assert not c.expired()
+
+
+def test_remaining_without_any_clock_is_an_error() -> None:
+    c = ctx(deadline=10.0)
+    with pytest.raises(ValueError, match="no clock"):
+        c.remaining()
+    with pytest.raises(ValueError, match="no clock"):
+        c.expired()
+
+
+def test_explicit_clock_overrides_the_context_clock() -> None:
+    context_clock = ManualClock(start=0.0)
+    other = ManualClock(start=8.0)
+    c = ctx(deadline=10.0, clock=context_clock)
+    assert c.remaining(other) == 2.0  # measured against the passed clock
+
+
+def test_start_derives_absolute_deadline_from_budget() -> None:
+    clock = ManualClock(start=100.0)
+    c = InvocationContext.start("op", "cid", clock=clock, budget=5.0)
+    assert c.deadline == 105.0
+    assert c.clock is clock
+    assert c.remaining() == 5.0
+
+
+def test_start_without_budget_has_no_deadline() -> None:
+    clock = ManualClock()
+    c = InvocationContext.start("op", "cid", clock=clock)
+    assert c.deadline is None
+    assert c.remaining() is None
+
+
+def test_arguments_channel_is_carried_and_survives_child() -> None:
+    c = ctx(arguments={"query": "sre", "limit": 10})
+    assert c.arguments == {"query": "sre", "limit": 10}
+    child = c.child(attempt=2)
+    assert child.arguments == {"query": "sre", "limit": 10}
+
+
 def test_current_context_helpers() -> None:
     assert current_context() is None
     c = ctx()

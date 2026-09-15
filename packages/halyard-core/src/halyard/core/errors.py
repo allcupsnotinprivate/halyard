@@ -33,6 +33,21 @@ class AttemptTimeout(TransientError):
     """A single attempt ran out of its per-attempt time budget."""
 
 
+class RetryExhausted(TransientError):
+    """Every retry attempt was spent; wraps the last underlying failure.
+
+    Raised by the retry link when a retryable call keeps failing until the
+    attempt budget is used up. The original exception is preserved both as
+    ``__cause__`` and on ``last_error`` so callers can catch a single
+    framework type instead of every client library's exception.
+    """
+
+    def __init__(self, message: str, *, attempts: int, last_error: BaseException) -> None:
+        super().__init__(message)
+        self.attempts = attempts
+        self.last_error = last_error
+
+
 class ErrorClass(StrEnum):
     """Classification verdict used by retry (and future circuit breaker)."""
 

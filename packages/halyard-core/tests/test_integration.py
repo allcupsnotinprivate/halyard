@@ -13,7 +13,7 @@ import pytest
 
 from halyard.core.axes import AxisRegistry
 from halyard.core.context import InvocationContext
-from halyard.core.errors import AttemptTimeout, DeadlineExceeded, PermanentError, TransientError
+from halyard.core.errors import AttemptTimeout, DeadlineExceeded, PermanentError, RetryExhausted, TransientError
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.builtin.retry import RetryFactory, RetrySettings
 from halyard.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutSettings
@@ -126,14 +126,19 @@ async def test_hang_is_cut_by_timeout_and_retried() -> None:
     assert call.log == ["attempt 1: hang", "attempt 2: ok"]
 
 
-async def test_all_attempts_hang_ends_with_attempt_timeout() -> None:
+async def test_all_attempts_hang_ends_with_retry_exhausted() -> None:
     clock = InstantClock()
     call = ScriptedCall(["hang", "hang"])
     chain = make_chain(call, clock, attempts=2)
 
-    with pytest.raises(AttemptTimeout):
+    # Every attempt times out; the budget is spent, so retry surfaces a single
+    # framework error wrapping the last AttemptTimeout instead of leaking it raw.
+    with pytest.raises(RetryExhausted) as excinfo:
         await chain(ctx())
     assert call.calls == 2
+    assert excinfo.value.attempts == 2
+    assert isinstance(excinfo.value.last_error, AttemptTimeout)
+    assert isinstance(excinfo.value.__cause__, AttemptTimeout)
 
 
 async def test_permanent_failure_stops_the_whole_chain_at_once() -> None:
