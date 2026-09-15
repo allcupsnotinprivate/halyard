@@ -7,3 +7,4 @@
 - `telemetry_console.py` - the instrumented chain printing spans and metrics to the console.
 - `composition_container.py` - registering components and driving them through a container.
 - `testing_a_component.py` - testing a component with `halyard.core.testing` (drive + scenarios).
+- `runtime_app.py` - halyard-runtime: @component, App, env config and a typed proxy.
