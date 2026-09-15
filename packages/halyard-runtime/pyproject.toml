@@ -8,7 +8,11 @@ license = "Apache-2.0"
 authors = [{ name = "allcupsnotinprivate" }]
 dependencies = [
     "halyard-core",
+    "pydantic-settings>=2.5",
 ]
+
+[project.optional-dependencies]
+yaml = ["pydantic-settings[yaml]>=2.5"]
 
 [build-system]
 requires = ["hatchling"]

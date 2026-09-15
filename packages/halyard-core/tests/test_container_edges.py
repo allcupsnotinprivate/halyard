@@ -6,7 +6,7 @@ import anyio
 import pytest
 
 from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
-from halyard.core.component import AComponent, EmptySettings, Health, Lifetime, Policy, invocable
+from halyard.core.component import AComponent, Criticality, EmptySettings, Health, Lifetime, Policy, invocable
 from halyard.core.composition import Container, Registry
 from halyard.core.composition.endpoint import endpoint_axis
 from halyard.core.errors import ConfigurationError, RetryExhausted, TransientError
@@ -271,3 +271,39 @@ async def test_readiness_before_start_reports_not_running() -> None:
     result = await container.readiness()
     assert not result.ready
     assert result.components["worker"].state is Health.UNHEALTHY
+
+
+async def test_scoped_skips_a_degraded_optional_process_dependency() -> None:
+    class OptionalBackend(AComponent[EmptySettings, None, None]):
+        name = "opt-backend"
+        criticality = Criticality.OPTIONAL
+
+        async def start(self) -> None:
+            raise RuntimeError("backend down")
+
+        @invocable
+        async def go(self) -> None: ...
+
+    class ScopedFront(AComponent[EmptySettings, None, str]):
+        name = "scoped-front"
+        lifetime = Lifetime.SCOPED
+        scope = ScopeSpec(("tenant",))
+        backend: OptionalBackend  # annotated dependency; unset when degraded
+
+        @invocable
+        async def hello(self) -> str:
+            return "front"  # copes without the degraded backend
+
+    reg = Registry()
+    reg.register(OptionalBackend)
+    reg.register(ScopedFront)
+    axes = AxisRegistry()
+    axes.register(Axis(name="tenant", resolver=_tenant.get))
+    container = Container.build(reg, {"opt-backend": {}, "scoped-front": {}}, axes=axes)
+    await container.start()
+    assert container.is_degraded("opt-backend")
+
+    _tenant.set("acme")
+    outcome = await container.invoke("scoped-front", "hello")  # resolves deps, skipping the degraded one
+    assert outcome.value == "front"
+    await container.stop()

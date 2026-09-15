@@ -8,6 +8,8 @@ Run:
     uv run python examples/runtime_app.py
 """
 
+import os
+
 import anyio
 from pydantic import BaseModel
 
@@ -35,11 +37,11 @@ class Weather(AComponent[WeatherSettings, str, str]):
 
 
 async def main() -> None:
+    # Simulate deployment env (a real app just reads os.environ / a .env file):
+    os.environ["DEMO_WEATHER__CITY_DEFAULT"] = "reykjavik"
     app = App(
         config={"weather": {"policy": {"retry": {"attempts": 3, "base_delay": 0.05, "max_delay": 0.5}}}},
         env_prefix="DEMO",
-        # Simulated environment; in a real app this comes from os.environ:
-        environ={"DEMO_WEATHER__CITY_DEFAULT": "reykjavik"},
     )
 
     async with app.run():

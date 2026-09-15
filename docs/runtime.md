@@ -42,14 +42,23 @@ metaclass auto-registration: subclassing is not intent to register.
 
 ## Configuration
 
-`App` merges two layers into the deployment config (field by field, env wins):
+`App` merges config layers field by field, each overriding the previous: a
+**config file**, the **programmatic config**, a **`.env` file**, then the
+**environment**.
 
 ```python
 app = App(
-    env_prefix="MYAPP",
+    config_file="halyard.toml",  # .toml / .json / .yaml (yaml via the extra)
     config={"weather": {"policy": {"retry": {...}}}},
+    dotenv=".env",  # optional
+    env_prefix="MYAPP",  # highest layer
 )
 ```
+
+Reading is done by **pydantic-settings** (each source read into a dict);
+merging, provenance and validation stay in the core, so a bad value is still
+reported with its field path *and* which source it came from. A config file's
+shape is the same `{component: {field: value}}` mapping.
 
 Environment convention: `<PREFIX>_<COMPONENT>__<FIELD>[__<NESTED>...]`:
 
@@ -58,15 +67,41 @@ MYAPP_WEATHER__CITY_DEFAULT=reykjavik
 MYAPP_WEATHER__POLICY__RETRY__ATTEMPTS=3
 ```
 
-Values parse as JSON when possible (numbers, booleans, lists, objects), else
-stay strings - the core's validation coerces and reports errors with the field
-path and source. Prefixed variables without `__` (e.g. `MYAPP_DEBUG`) are the
-application's own and are ignored; a `__`-shaped variable naming an unknown
-component is an error (almost always a typo). Every registered component is
+Env values arrive as strings and are coerced by the core's validation. Env vars
+mapping to no component field are ignored. Every registered component is
 included in the container - an absent config section means "all defaults".
 
-All `Container.build` options (classifier, axes, telemetry providers,
+YAML support needs the extra: `pip install halyard-runtime[yaml]`.
+
+All `Container.build` options (classifier, telemetry providers,
 `framework_defaults`, a `SettingsResolver`, timeouts) pass through `App(...)`.
+Third-party components can be pulled in with `app.load_entry_points()`.
+
+## Axes and tenancy
+
+`app.axis` registers a contextvar-backed axis and returns a handle to bind it
+per request/task - the one-liner behind scoped components and `[axis]`-sliced
+state:
+
+```python
+tenant = app.axis("tenant", default="public")  # optional; omit default to require it
+
+with tenant.use("acme"):  # in a middleware/dependency
+    data = await app.proxy(Reports).daily()  # scoped instances resolve to "acme"
+```
+
+## Correlation and budgets
+
+```python
+with app.correlation(request_id):  # every call in the block inherits it
+    await app.invoke("weather", "forecast", city="oslo", budget=2.0)  # overall deadline
+
+fast = app.proxy(Weather, budget=1.5)  # budget bound to every proxy call
+```
+
+`budget` is an overall deadline in seconds (retries included); the per-attempt
+timeout link still bounds each attempt. `correlation_id` defaults to the
+ambient one, then a fresh id.
 
 ## Lifecycle
 
@@ -96,3 +131,20 @@ the `app` object they already have (`app.proxy(...)`, `app.invoke(...)`,
 lifespan (e.g. aiohttp), call `await app.start()` / `await app.stop()` from
 those callbacks; standalone scripts can simply do `async with app.lifespan():`
 or `async with app.run() as container:`.
+
+### Worker processes
+
+For a process with no web host, `app.serve()` starts the app and runs until
+`SIGINT`/`SIGTERM`, then drains and stops:
+
+```python
+async def main() -> None:
+    app = App(env_prefix="MYWORKER")
+    app.autodiscover("myworker.components")
+    await app.serve()  # returns when a shutdown signal arrives
+
+
+anyio.run(main)
+```
+
+Pass a `shutdown` event to drive it from your own code instead of signals.
