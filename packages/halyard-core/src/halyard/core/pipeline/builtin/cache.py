@@ -29,6 +29,7 @@ from pydantic_core import to_json
 from halyard.core.axes import EMPTY_SCOPE, ScopeKey, ScopeSpec
 from halyard.core.clock import Clock
 from halyard.core.context import InvocationContext
+from halyard.core.observe import FACT_CACHE
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
@@ -108,7 +109,7 @@ class CacheInterceptor:
         while True:
             entry = self._get(key, self._clock.monotonic())
             if entry is not None:
-                ctx.bag["cache"] = "hit"
+                ctx.bag[FACT_CACHE] = "hit"
                 if entry.kind == "error":
                     raise entry.payload
                 return Outcome(value=entry.payload, source="cache")
@@ -117,7 +118,7 @@ class CacheInterceptor:
             if inflight is None:
                 break  # no await since the miss check: we become the leader
 
-            ctx.bag["cache"] = "coalesced"
+            ctx.bag[FACT_CACHE] = "coalesced"
             await inflight.done.wait()
             if inflight.error is not None:
                 raise inflight.error
@@ -130,7 +131,7 @@ class CacheInterceptor:
     async def _lead(self, next: Next, ctx: InvocationContext, key: CacheKey) -> Outcome[object]:
         inflight = _InFlight()
         self._inflight[key] = inflight
-        ctx.bag["cache"] = "miss"
+        ctx.bag[FACT_CACHE] = "miss"
         try:
             outcome = await next(ctx)
         except Exception as exc:

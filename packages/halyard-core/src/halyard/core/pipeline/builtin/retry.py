@@ -21,6 +21,7 @@ from halyard.core.errors import (
     ErrorClassifier,
     RetryExhausted,
 )
+from halyard.core.observe import ATTR_ATTEMPT_NUMBER, ATTR_BACKOFF_DELAY, EVENT_RETRY_BACKOFF, SPAN_ATTEMPT, observer_of
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
@@ -72,6 +73,7 @@ class RetryInterceptor:
 
     async def call(self, next: Next, ctx: InvocationContext) -> Outcome[object]:
         started = self._clock.monotonic()
+        observer = observer_of(ctx)
 
         for attempt in range(1, self._settings.attempts + 1):
             if ctx.expired(self._clock):
@@ -79,7 +81,10 @@ class RetryInterceptor:
 
             attempt_ctx = ctx.child(attempt=attempt)
             try:
-                outcome = await next(attempt_ctx)
+                # The span closes before ``except`` runs, so a failed attempt
+                # records its exception on its own span.
+                with observer.span(SPAN_ATTEMPT, {ATTR_ATTEMPT_NUMBER: attempt}):
+                    outcome = await next(attempt_ctx)
             except Exception as exc:
                 if self._classifier.classify(exc) != self._settings.retry_on:
                     raise
@@ -101,6 +106,7 @@ class RetryInterceptor:
                     raise DeadlineExceeded(
                         f"retry of '{ctx.operation}' abandoned: backoff {delay:.3f}s exceeds remaining {remaining:.3f}s"
                     ) from exc
+                observer.event(EVENT_RETRY_BACKOFF, {ATTR_BACKOFF_DELAY: delay, ATTR_ATTEMPT_NUMBER: attempt + 1})
                 await self._clock.sleep(delay)
             else:
                 return replace(

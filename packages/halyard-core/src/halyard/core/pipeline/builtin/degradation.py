@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from halyard.core.axes import EMPTY_SCOPE, ScopeKey, ScopeSpec
 from halyard.core.context import InvocationContext
 from halyard.core.errors import DefaultErrorClassifier, ErrorClass, ErrorClassifier
+from halyard.core.observe import FACT_DEGRADED
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
@@ -71,7 +72,7 @@ class DegradationInterceptor:
             if self._classifier.classify(exc) != self._settings.degrade_on:
                 raise  # not unavailability: a real error must surface
             self._degraded_count += 1
-            ctx.bag["degraded"] = True
+            ctx.bag[FACT_DEGRADED] = True
             return Outcome(value=self._stub(ctx), source="stub", degraded=True)
 
 

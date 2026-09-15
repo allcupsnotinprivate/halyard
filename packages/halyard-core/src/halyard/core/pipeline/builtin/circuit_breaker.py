@@ -27,6 +27,7 @@ from halyard.core.axes import ScopeKey, ScopeSpec
 from halyard.core.clock import Clock
 from halyard.core.context import InvocationContext
 from halyard.core.errors import CircuitOpen, DefaultErrorClassifier, ErrorClass, ErrorClassifier
+from halyard.core.observe import ATTR_BREAKER_STATE, EVENT_BREAKER_REJECTED, observer_of
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
@@ -104,9 +105,11 @@ class CircuitBreakerInterceptor:
                     self._state = CircuitState.HALF_OPEN
                     self._probe_in_flight = True  # this call is the probe
                     return
+                observer_of(ctx).event(EVENT_BREAKER_REJECTED, {ATTR_BREAKER_STATE: "open"})
                 raise CircuitOpen(f"circuit for '{ctx.operation}' is open")
             if self._state is CircuitState.HALF_OPEN:
                 if self._probe_in_flight:
+                    observer_of(ctx).event(EVENT_BREAKER_REJECTED, {ATTR_BREAKER_STATE: "half_open"})
                     raise CircuitOpen(f"circuit for '{ctx.operation}' is half-open; a probe is already in flight")
                 self._probe_in_flight = True
                 return
