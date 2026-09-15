@@ -1,0 +1,150 @@
+# Write your first component
+
+A component wraps one integration - an HTTP API, a database, a queue. You write
+the *call*; the framework wraps every call with retry, timeout, circuit
+breaking, caching and metrics, driven by config. This guide takes you from
+nothing to a tested component with retry, cache and metrics.
+
+## 1. Write the component
+
+Subclass `AComponent[Settings, In, Out]`, declare your settings as a pydantic
+model, and mark entry points with `@invocable`. Put resource setup in `start` /
+`stop`; the method itself just makes the call.
+
+```python
+from pydantic import BaseModel
+from halyard.core.component import AComponent, invocable
+
+
+class ProfilesSettings(BaseModel):
+    base_url: str
+
+
+class Profiles(AComponent[ProfilesSettings, str, dict]):
+    name = "profiles"
+
+    def endpoint(self) -> str | None:
+        return self.settings.base_url  # breaker/concurrency slice by host
+
+    async def start(self) -> None:
+        self._client = make_client(self.settings.base_url)  # your real client
+
+    async def stop(self) -> None:
+        await self._client.aclose()
+
+    @invocable
+    async def get(self, user_id: str) -> dict:
+        resp = await self._client.get(f"/users/{user_id}")
+        resp.raise_for_status()
+        return resp.json()
+```
+
+That is the whole component. Notice it says nothing about retries or caching.
+
+## 2. Turn on resilience with config
+
+Resilience is deployment config, not code. Each link is on when you give it
+settings:
+
+```python
+config = {
+    "profiles": {
+        "base_url": "https://api.example.com",
+        "policy": {
+            "retry": {"attempts": 3, "base_delay": 0.1, "max_delay": 1.0},
+            "cache": {"ttl": 30.0, "max_entries": 1000},
+        },
+    },
+}
+```
+
+## 3. Run it
+
+```python
+from halyard.core.component import Registry
+from halyard.core.composition import Container
+
+registry = Registry()
+registry.register(Profiles)
+
+container = Container.build(registry, config)
+await container.start()
+
+outcome = await container.invoke("profiles", "get", user_id="42")
+print(outcome.value, outcome.source)  # second identical call -> source == "cache"
+
+await container.stop()
+```
+
+**Metrics and traces** are already there: the container instruments every call.
+Configure an OpenTelemetry SDK (or pass providers to `Container.build`) and you
+get a span per call, child spans per retry, and the `halyard.*` metrics - see
+[telemetry.md](telemetry.md). With no SDK it is a free no-op.
+
+**Errors** map cleanly: retry repeats only transient failures; permanent ones
+propagate. Raise `TransientError` / `PermanentError` from your method, or pass a
+`classifier=` to `Container.build` that maps your client library's exceptions.
+
+## 4. Test it - without a running system
+
+`halyard.core.testing.drive` runs your real component through its real chain on
+an instant clock, so backoff never actually waits. Inject a fake client that
+misbehaves and assert the outcome:
+
+```python
+import pytest
+from halyard.core.testing import drive
+
+
+class FlakyClient:
+    def __init__(self, fail: int, payload: dict) -> None:
+        self.fail, self.payload, self.calls = fail, payload, 0
+
+    async def get(self, path: str) -> "FlakyClient":
+        self.calls += 1
+        if self.calls <= self.fail:
+            raise TransientError("upstream warming up")
+        return self
+
+    def raise_for_status(self) -> None: ...
+    def json(self) -> dict:
+        return self.payload
+
+
+@pytest.mark.anyio
+async def test_profiles_recovers_from_two_failures() -> None:
+    profiles = Profiles(ProfilesSettings(base_url="https://api.example.com"))
+    profiles._client = FlakyClient(fail=2, payload={"id": "42"})
+
+    outcome = await drive(
+        profiles,
+        "get",
+        config={"policy": {"retry": {"attempts": 3, "base_delay": 1.0, "max_delay": 5.0}}},
+        user_id="42",
+    )
+    assert outcome.value == {"id": "42"}
+    assert outcome.attempts == 3  # recovered on the 3rd try, zero real delay
+```
+
+To check a *policy* against a misbehaving service without writing a component,
+use `drive_policy` with a scenario:
+
+```python
+from halyard.core.testing import drive_policy, fails_then_succeeds
+
+outcome = await drive_policy(
+    {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 8.0}},
+    fails_then_succeeds(2, value="ok"),
+)
+assert outcome.attempts == 3
+```
+
+The testing package also exports `ManualClock`, `InstantClock`,
+`FakeSettingsResolver`, an in-memory state store, and scenarios
+(`always_transient`, `always_permanent`, `always_times_out`, `hangs`).
+
+## Where next
+
+- [composition.md](composition.md) - dependencies, lifecycle, per-tenant slices,
+  health, layered config and introspection.
+- [telemetry.md](telemetry.md) - the metrics and tracing contract.
