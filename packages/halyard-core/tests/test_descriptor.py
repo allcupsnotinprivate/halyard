@@ -136,8 +136,41 @@ def test_custom_link_models_shape_the_policy() -> None:
     assert "timeout" not in policy_fields
 
 
-def test_component_without_name_is_rejected() -> None:
+def test_component_name_is_derived_from_the_class_name() -> None:
+    class MyShinyService(AComponent[EmptySettings, None, None]):
+        @invocable
+        async def go(self) -> None: ...
+
+    assert MyShinyService.name == "my_shiny_service"
+    assert describe(MyShinyService).identity.name == "my_shiny_service"
+
+
+def test_explicit_name_wins_over_derivation() -> None:
+    class Renamed(AComponent[EmptySettings, None, None]):
+        name = "custom-name"
+
+        @invocable
+        async def go(self) -> None: ...
+
+    assert describe(Renamed).identity.name == "custom-name"
+
+
+def test_subclass_gets_its_own_derived_name() -> None:
+    class BaseWidget(AComponent[EmptySettings, None, None]):
+        @invocable
+        async def go(self) -> None: ...
+
+    class FancyWidget(BaseWidget):
+        pass
+
+    assert BaseWidget.name == "base_widget"
+    assert FancyWidget.name == "fancy_widget"  # not inherited
+
+
+def test_component_with_empty_name_is_rejected() -> None:
     class Nameless(AComponent[EmptySettings, None, None]):
+        name = ""
+
         @invocable
         async def go(self) -> None: ...
 

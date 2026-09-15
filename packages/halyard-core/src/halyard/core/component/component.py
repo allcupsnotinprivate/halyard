@@ -15,7 +15,8 @@ argument, so it is declared exactly once.
 
 from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin
+import re
+from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
@@ -28,6 +29,14 @@ from .policy import Criticality, Policy
 TSettings = TypeVar("TSettings", bound=BaseModel)
 TIn = TypeVar("TIn")
 TOut = TypeVar("TOut")
+
+_CAMEL_BOUNDARY_1 = re.compile(r"(.)([A-Z][a-z]+)")
+_CAMEL_BOUNDARY_2 = re.compile(r"([a-z0-9])([A-Z])")
+
+
+def _to_snake_case(name: str) -> str:
+    name = _CAMEL_BOUNDARY_1.sub(r"\1_\2", name)
+    return _CAMEL_BOUNDARY_2.sub(r"\1_\2", name).lower()
 
 
 class Lifetime(StrEnum):
@@ -49,15 +58,30 @@ class EmptySettings(BaseModel):
 class AComponent(Generic[TSettings, TIn, TOut]):
     """Base class for components.
 
-    Parameterised as ``AComponent[Settings, In, Out]``. Subclasses set at least
-    :attr:`name`. Optional class attributes: :attr:`version`, :attr:`policy`
+    Parameterised as ``AComponent[Settings, In, Out]``. The :attr:`name`
+    defaults to the snake_cased class name; set the class attribute to
+    override. Other optional class attributes: :attr:`version`, :attr:`policy`
     (component-wide default), :attr:`dependencies` and :attr:`criticality`. The
     settings model comes from the ``Settings`` type argument - use
     :class:`EmptySettings` for a component that needs none.
+
+    Dependencies can be declared two ways: the :attr:`dependencies` name tuple
+    (accessed via :meth:`dependency`), or a class-level annotation whose type
+    is another component - the container then assigns the resolved instance to
+    that attribute, fully typed::
+
+        class Search(AComponent[SearchSettings, str, list[Doc]]):
+            embedder: Embedder  # dependency; self.embedder after start
     """
 
-    #: Required: the component's stable name.
+    #: The component's stable name; derived from the class name if not set.
     name: ClassVar[str]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if "name" not in cls.__dict__:
+            cls.name = _to_snake_case(cls.__name__)
+
     #: Optional version; part of the identity uid.
     version: ClassVar[str] = "0"
     #: Component-wide default policy; a method may override it.
@@ -79,8 +103,16 @@ class AComponent(Generic[TSettings, TIn, TOut]):
         self._deps: Mapping[str, AComponent[Any, Any, Any]] = {}
 
     def bind_dependencies(self, deps: Mapping[str, "AComponent[Any, Any, Any]"]) -> None:
-        """Install resolved dependencies (called by the container before start)."""
+        """Install resolved dependencies (called by the container before start).
+
+        Annotation-declared dependencies are additionally assigned to their
+        attributes, so ``self.embedder`` is the live instance.
+        """
         self._deps = dict(deps)
+        for attr, dep_cls in dependency_annotations(type(self)).items():
+            instance = self._deps.get(dep_cls.name)
+            if instance is not None:
+                setattr(self, attr, instance)
 
     def dependency(self, name: str) -> "AComponent[Any, Any, Any]":
         """Return a declared dependency's instance."""
@@ -114,6 +146,39 @@ class AComponent(Generic[TSettings, TIn, TOut]):
     async def health(self) -> HealthStatus:
         """Report health. Default: healthy."""
         return HealthStatus.ok()
+
+
+_annotation_cache: dict[type, Mapping[str, type["AComponent[Any, Any, Any]"]]] = {}
+
+
+def dependency_annotations(cls: type["AComponent[Any, Any, Any]"]) -> Mapping[str, type["AComponent[Any, Any, Any]"]]:
+    """Attribute -> component type for annotation-declared dependencies.
+
+    A class-level annotation counts as a dependency when its type is a strict
+    ``AComponent`` subclass and it is not a ``ClassVar``. Base-class annotations
+    are inherited; a redeclared attribute takes the most-derived type.
+    """
+    cached = _annotation_cache.get(cls)
+    if cached is not None:
+        return cached
+    result: dict[str, type[AComponent[Any, Any, Any]]] = {}
+    hints = get_type_hints(cls)
+    for attr, annotation in hints.items():
+        if get_origin(annotation) is ClassVar:
+            continue
+        if isinstance(annotation, type) and annotation is not AComponent and issubclass(annotation, AComponent):
+            result[attr] = annotation
+    _annotation_cache[cls] = result
+    return result
+
+
+def component_dependencies(cls: type["AComponent[Any, Any, Any]"]) -> tuple[str, ...]:
+    """All declared dependency names: the explicit tuple plus annotated ones."""
+    names = list(cls.dependencies)
+    for dep_cls in dependency_annotations(cls).values():
+        if dep_cls.name not in names:
+            names.append(dep_cls.name)
+    return tuple(names)
 
 
 def settings_model_of(cls: type["AComponent[Any, Any, Any]"]) -> type[BaseModel] | None:

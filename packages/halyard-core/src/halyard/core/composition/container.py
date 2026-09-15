@@ -12,10 +12,10 @@ state (breaker, concurrency) is shared through one link store across instances
 that talk to the same endpoint.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Coroutine, Mapping
 import contextlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar, cast
 import uuid
 
 import anyio
@@ -64,12 +64,36 @@ from .introspection import (
 from .registry import Registry
 from .wiring import active_links, make_base, method_factories
 
+C = TypeVar("C", bound=AComponent[Any, Any, Any])
+
 
 def _first_leaf(exc: BaseException) -> BaseException:
     """Unwrap a (Base)ExceptionGroup to its first leaf exception."""
     while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
         exc = exc.exceptions[0]
     return exc
+
+
+class _InvokeProxy:
+    """Typed facade over ``Container.invoke`` for one component."""
+
+    def __init__(self, container: "Container", name: str, methods: frozenset[str]) -> None:
+        self._container = container
+        self._name = name
+        self._methods = methods
+
+    def __getattr__(self, item: str) -> Callable[..., Coroutine[Any, Any, Any]]:
+        if item not in self._methods:
+            raise AttributeError(f"component '{self._name}' has no invocable '{item}'")
+
+        async def call(**arguments: Any) -> Any:
+            outcome = await self._container.invoke(self._name, item, **arguments)
+            return outcome.value
+
+        return call
+
+    def __repr__(self) -> str:
+        return f"<proxy for component '{self._name}'>"
 
 
 @dataclass(frozen=True)
@@ -402,6 +426,42 @@ class Container:
                 return await instance.health()  # via timeout only, not the full chain
         except Exception:
             return HealthStatus.unhealthy("health check failed")
+
+    # --- instance access -----------------------------------------------------
+
+    async def get(self, ref: "type[C] | str") -> "C":
+        """Return a component's live instance (by type or name).
+
+        Process components return the running instance; scoped ones resolve
+        for the current axis values (created lazily). ⚠️ Calling methods on the
+        raw instance **bypasses the policy chain** - no retry, breaker or
+        telemetry. Use :meth:`invoke` or :meth:`proxy` for guarded calls.
+        """
+        name = ref if isinstance(ref, str) else ref.name
+        if not self._started:
+            raise ConfigurationError("container is not started")
+        reg = self._registration(name)
+        if reg.descriptor.lifetime is Lifetime.PROCESS:
+            instance = self._process.get(name)
+            if instance is None:
+                raise ComponentUnavailable(f"component '{name}' is degraded")
+            return cast("C", instance)
+        scoped, _ = await self._scoped_instance(name)
+        return cast("C", scoped)
+
+    def proxy(self, ref: "type[C] | str") -> "C":
+        """A typed facade whose invocable methods run through the full chain.
+
+        Each ``@invocable`` method becomes ``await proxy.method(**kwargs)`` -
+        equivalent to :meth:`invoke` (retry, breaker, telemetry included) but
+        with the component's signatures for the type checker. Methods take
+        keyword arguments only and return the outcome's **value**; use
+        :meth:`invoke` when you need the full :class:`Outcome` (e.g. the
+        ``degraded`` flag).
+        """
+        name = ref if isinstance(ref, str) else ref.name
+        reg = self._registration(name)
+        return cast("C", _InvokeProxy(self, name, frozenset(reg.descriptor.invocables)))
 
     # --- introspection -------------------------------------------------------
 

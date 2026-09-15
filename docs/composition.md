@@ -11,7 +11,10 @@ Two distinct things, deliberately not merged:
   `@registry.register` decorator or `registry.register(cls)`), never an import
   side effect. Third-party components are discovered through entry points
   (group `halyard.components`). Registering builds and caches the descriptor, so
-  a malformed component fails at registration.
+  a malformed component fails at registration. Component names derive from the
+  class name (`SearchService` → `search_service`) unless set explicitly, and
+  dependencies may be declared as typed class annotations (see
+  [first-component.md](first-component.md)).
 - **`Container`** - what is configured and running in this process, built from
   configuration. It holds no global state, so a process can run several
   independent containers (tests included).
@@ -31,6 +34,19 @@ await container.stop()
 
 The `configs` mapping is the deployment layer (see below); each assembled config
 is validated against that type's dynamic config model (own fields + `policy`).
+
+## Instance access
+
+Three ways to reach a component, in order of preference:
+
+- `container.invoke("name", "method", **args)` → full chain, returns `Outcome`
+  (value + source/degraded/attempts).
+- `container.proxy(Type)` → a typed facade; each `@invocable` method routes
+  through `invoke` (chain included) but keeps the component's signatures for
+  the type checker. Keyword arguments only; returns the outcome's *value*.
+- `await container.get(Type)` → the raw live instance (scoped ones resolve for
+  the current axis values). ⚠️ Direct method calls bypass the chain entirely -
+  no retry, breaker or telemetry. Meant for advanced wiring, not for calls.
 
 ## Dependency graph
 

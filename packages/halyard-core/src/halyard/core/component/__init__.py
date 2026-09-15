@@ -1,6 +1,13 @@
 """Component contract: base class, invocable methods, and derived descriptors."""
 
-from .component import AComponent, EmptySettings, Lifetime, settings_model_of
+from .component import (
+    AComponent,
+    EmptySettings,
+    Lifetime,
+    component_dependencies,
+    dependency_annotations,
+    settings_model_of,
+)
 from .descriptor import BUILTIN_LINK_MODELS, Descriptor, describe
 from .health import Health, HealthStatus
 from .invocable import InvocableSpec, invocable, is_invocable, policy_override
@@ -22,6 +29,8 @@ __all__ = [
     "Policy",
     "build_config_model",
     "build_policy_model",
+    "component_dependencies",
+    "dependency_annotations",
     "describe",
     "invocable",
     "is_invocable",

@@ -26,7 +26,7 @@ from halyard.core.pipeline.builtin.timeout import TimeoutSettings
 from halyard.core.pipeline.chain import DEFAULT_ORDER
 from halyard.core.unit import Identity
 
-from .component import AComponent, Lifetime, settings_model_of
+from .component import AComponent, Lifetime, component_dependencies, settings_model_of
 from .invocable import (
     InvocableSpec,
     build_input_model,
@@ -118,7 +118,7 @@ def describe(
         settings_model=own_settings,
         config_model=config_model,
         invocables=MappingProxyType(invocables),
-        dependencies=tuple(cls.dependencies),
+        dependencies=component_dependencies(cls),
         criticality=cls.criticality,
         lifetime=cls.lifetime,
         scope=cls.scope,
