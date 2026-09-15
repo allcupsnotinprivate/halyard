@@ -13,10 +13,13 @@ and cached on the class; the settings model is recovered from the generic
 argument, so it is declared exactly once.
 """
 
+from collections.abc import Mapping
+from enum import StrEnum
 from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
 from pydantic import BaseModel
 
+from halyard.core.axes import EMPTY_SCOPE, ScopeSpec
 from halyard.core.unit import Identity
 
 from .health import HealthStatus
@@ -25,6 +28,18 @@ from .policy import Criticality, Policy
 TSettings = TypeVar("TSettings", bound=BaseModel)
 TIn = TypeVar("TIn")
 TOut = TypeVar("TOut")
+
+
+class Lifetime(StrEnum):
+    """How many instances of a component the container keeps.
+
+    ``PROCESS`` - a single instance for the whole process, created at startup.
+    ``SCOPED`` - one instance per axis key (see :attr:`AComponent.scope`),
+    created lazily on first use and evicted by LRU.
+    """
+
+    PROCESS = "process"
+    SCOPED = "scoped"
 
 
 class EmptySettings(BaseModel):
@@ -51,13 +66,37 @@ class AComponent(Generic[TSettings, TIn, TOut]):
     dependencies: ClassVar[tuple[str, ...]] = ()
     #: Whether the system may run without this component.
     criticality: ClassVar[Criticality] = Criticality.REQUIRED
+    #: How many instances the container keeps.
+    lifetime: ClassVar[Lifetime] = Lifetime.PROCESS
+    #: Axes a scoped component is sliced along. Must be empty for PROCESS and
+    #: non-empty for SCOPED (enforced by ``describe``).
+    scope: ClassVar[ScopeSpec] = EMPTY_SCOPE
 
     def __init__(self, settings: TSettings) -> None:
         self.settings: TSettings = settings
+        self._deps: Mapping[str, AComponent[Any, Any, Any]] = {}
+
+    def bind_dependencies(self, deps: Mapping[str, "AComponent[Any, Any, Any]"]) -> None:
+        """Install resolved dependencies (called by the container before start)."""
+        self._deps = dict(deps)
+
+    def dependency(self, name: str) -> "AComponent[Any, Any, Any]":
+        """Return a declared dependency's instance."""
+        return self._deps[name]
 
     @property
     def identity(self) -> Identity:
         return Identity.of(self.name, self.version)
+
+    def endpoint(self) -> str | None:
+        """Identity of the external system this instance talks to.
+
+        Drives ``[endpoint]``-sliced link state (breaker, concurrency): two
+        instances sharing an endpoint share that state. Default ``None`` means
+        the instance is its own endpoint (per-instance link state). Override to
+        return the resolved host.
+        """
+        return None
 
     @property
     def settings_model(self) -> type[BaseModel] | None:

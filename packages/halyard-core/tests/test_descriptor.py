@@ -3,11 +3,13 @@
 from pydantic import BaseModel
 import pytest
 
+from halyard.core.axes import EMPTY_SCOPE, ScopeSpec
 from halyard.core.component import (
     AComponent,
     Criticality,
     Descriptor,
     EmptySettings,
+    Lifetime,
     Policy,
     describe,
     invocable,
@@ -49,6 +51,46 @@ def test_descriptor_basic_metadata() -> None:
     assert d.settings_model is SearchSettings
     assert d.dependencies == ("embedder",)
     assert d.criticality is Criticality.OPTIONAL
+    assert d.lifetime is Lifetime.PROCESS
+    assert d.scope == EMPTY_SCOPE
+
+
+def test_scoped_component_carries_its_scope() -> None:
+    class Tenant(AComponent[EmptySettings, None, None]):
+        name = "tenant"
+        lifetime = Lifetime.SCOPED
+        scope = ScopeSpec(("tenant",))
+
+        @invocable
+        async def go(self) -> None: ...
+
+    d = describe(Tenant)
+    assert d.lifetime is Lifetime.SCOPED
+    assert d.scope.axes == ("tenant",)
+
+
+def test_scoped_component_without_scope_is_rejected() -> None:
+    class Bad(AComponent[EmptySettings, None, None]):
+        name = "bad-scoped"
+        lifetime = Lifetime.SCOPED
+
+        @invocable
+        async def go(self) -> None: ...
+
+    with pytest.raises(ValueError, match="non-empty 'scope'"):
+        describe(Bad)
+
+
+def test_process_component_with_scope_is_rejected() -> None:
+    class Bad(AComponent[EmptySettings, None, None]):
+        name = "bad-process"
+        scope = ScopeSpec(("tenant",))
+
+        @invocable
+        async def go(self) -> None: ...
+
+    with pytest.raises(ValueError, match="must not declare a 'scope'"):
+        describe(Bad)
 
 
 def test_invocables_are_discovered() -> None:

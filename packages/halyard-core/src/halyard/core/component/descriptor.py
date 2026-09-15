@@ -17,12 +17,16 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from halyard.core.axes import ScopeSpec
+from halyard.core.pipeline.builtin.cache import CacheSettings
+from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerSettings
+from halyard.core.pipeline.builtin.concurrency import ConcurrencySettings
 from halyard.core.pipeline.builtin.retry import RetrySettings
 from halyard.core.pipeline.builtin.timeout import TimeoutSettings
 from halyard.core.pipeline.chain import DEFAULT_ORDER
 from halyard.core.unit import Identity
 
-from .component import AComponent, settings_model_of
+from .component import AComponent, Lifetime, settings_model_of
 from .invocable import (
     InvocableSpec,
     build_input_model,
@@ -38,7 +42,13 @@ _CACHE = "__halyard_descriptor__"
 
 #: Settings models of the links the config model knows about by default.
 BUILTIN_LINK_MODELS: Mapping[str, type[BaseModel]] = MappingProxyType(
-    {"retry": RetrySettings, "timeout": TimeoutSettings}
+    {
+        "concurrency": ConcurrencySettings,
+        "cache": CacheSettings,
+        "circuit_breaker": CircuitBreakerSettings,
+        "retry": RetrySettings,
+        "timeout": TimeoutSettings,
+    }
 )
 
 
@@ -52,6 +62,8 @@ class Descriptor:
     invocables: Mapping[str, InvocableSpec]
     dependencies: tuple[str, ...]
     criticality: Criticality
+    lifetime: Lifetime
+    scope: ScopeSpec
 
     def config_json_schema(self) -> dict[str, Any]:
         """JSON Schema of the full config (own fields + policy)."""
@@ -89,6 +101,11 @@ def describe(
     if not invocables:
         raise ValueError(f"component '{owner}' declares no @invocable methods")
 
+    if cls.lifetime is Lifetime.SCOPED and not cls.scope:
+        raise ValueError(f"scoped component '{owner}' must declare a non-empty 'scope'")
+    if cls.lifetime is Lifetime.PROCESS and cls.scope:
+        raise ValueError(f"process component '{owner}' must not declare a 'scope'")
+
     config_model = build_config_model(
         owner,
         own_settings=own_settings,
@@ -103,6 +120,8 @@ def describe(
         invocables=MappingProxyType(invocables),
         dependencies=tuple(cls.dependencies),
         criticality=cls.criticality,
+        lifetime=cls.lifetime,
+        scope=cls.scope,
     )
     setattr(cls, _CACHE, descriptor)
     return descriptor

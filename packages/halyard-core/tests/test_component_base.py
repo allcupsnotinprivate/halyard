@@ -3,12 +3,14 @@
 from pydantic import BaseModel
 import pytest
 
+from halyard.core.axes import EMPTY_SCOPE
 from halyard.core.component import (
     AComponent,
     Criticality,
     EmptySettings,
     Health,
     HealthStatus,
+    Lifetime,
     invocable,
     settings_model_of,
 )
@@ -84,6 +86,9 @@ async def test_defaults_of_optional_class_attributes() -> None:
     assert Sample.policy is None
     assert Sample.dependencies == ()
     assert Sample.criticality is Criticality.REQUIRED
+    assert Sample.lifetime is Lifetime.PROCESS
+    assert Sample.scope == EMPTY_SCOPE
+    assert Sample(Settings(url="x")).endpoint() is None
 
 
 def test_health_status_helpers() -> None:

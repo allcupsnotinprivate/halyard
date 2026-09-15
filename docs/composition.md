@@ -1,0 +1,85 @@
+# Composition
+
+The composition layer turns component *types* into a running system: a registry
+of what exists, and a container of what is configured and running.
+
+## Registry vs container
+
+Two distinct things, deliberately not merged:
+
+- **`Registry`** - which component types exist. Registration is explicit (the
+  `@registry.register` decorator or `registry.register(cls)`), never an import
+  side effect. Third-party components are discovered through entry points
+  (group `halyard.components`). Registering builds and caches the descriptor, so
+  a malformed component fails at registration.
+- **`Container`** - what is configured and running in this process, built from
+  configuration. It holds no global state, so a process can run several
+  independent containers (tests included).
+
+```python
+container = Container.build(
+    registry,
+    {
+        "embedder": {},
+        "search": {"index": "primary", "policy": {"retry": {"attempts": 3, "base_delay": 0.0, "max_delay": 0.1}}},
+    },
+)
+await container.start()
+outcome = await container.invoke("search", "query", text="halyard")
+await container.stop()
+```
+
+Configuration is a `{component_name: config_dict}` mapping; each config is
+validated against that type's dynamic config model (own fields + `policy`).
+Multi-source config merging is a later concern - here the mapping is the source.
+
+## Dependency graph
+
+Validated at build time, before anything starts, with errors naming the pair:
+
+- missing dependencies (a declared dependency is not configured);
+- cycles (the error prints the cycle path);
+- **scope leak** - a `process`-lifetime component cannot depend on a `scoped`
+  one, or it would capture one scope's instance for everyone.
+
+## Lifetime and scope
+
+- `Lifetime.PROCESS` (default) - a single instance, started at `start()` in
+  dependency order (independent branches in parallel), each with an init
+  timeout. A required component failing aborts startup; an optional one is
+  marked degraded and the system continues.
+- `Lifetime.SCOPED` - one instance per axis key (the component's `scope`),
+  created lazily on first use and evicted by LRU (calling `stop()`).
+
+`stop()` drains in-flight calls, then stops everything in reverse order.
+
+## The chain per method
+
+Each invocable is wired through its links: the order comes from the config's
+`policy.chain`, the method's effective policy restricts which links are allowed
+(so a `health` method pinned to `("timeout",)` is never retried), and a link is
+active only when it also has settings. Telemetry wraps the whole thing from the
+outside. The base call binds the method, passing arguments from the context and
+injecting the context itself if the method declares an `InvocationContext`
+parameter.
+
+## The endpoint axis (axes in action)
+
+The built-in `endpoint` axis reflects which external system the current
+*instance* talks to (`AComponent.endpoint()`), bound per invocation. Because a
+single link store backs the container, `[endpoint]`-sliced state (circuit
+breaker, concurrency's outer limit) is shared by instances on the same endpoint
+and separated across different ones - with no component declaring it. Other axes
+(e.g. a tenant axis for scoped components) are registered by the application.
+
+## Health
+
+Liveness and readiness are separate:
+
+- **Liveness** - is the process up? Dependencies are never consulted.
+- **Readiness** - can the system serve? Every *required* component must be
+  healthy; a degraded *optional* one is reported but does not break readiness.
+  Health aggregates bottom-up: a component is downgraded when a *required*
+  dependency is unhealthy, but an unhealthy *optional* dependency leaves it
+  alone. A component's health check runs through a timeout only, never the full
+  chain.
