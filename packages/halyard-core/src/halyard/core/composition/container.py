@@ -1,0 +1,392 @@
+"""Instance container: what is configured and running in this process.
+
+Distinct from the registry (which types *exist*): the container is built from
+configuration, validates the dependency graph, starts components in dependency
+order, wires each invocable method through its policy chain (telemetry outside),
+and stops in reverse with a drain. It holds no global state, so a process can
+run several independent containers.
+
+Endpoint slicing works here for the first time: each invocation binds the
+current endpoint from the instance's settings, and ``[endpoint]``-sliced link
+state (breaker, concurrency) is shared through one link store across instances
+that talk to the same endpoint.
+"""
+
+from collections.abc import Mapping
+import contextlib
+from dataclasses import dataclass
+import inspect
+from typing import Any, get_type_hints
+import uuid
+
+import anyio
+import anyio.lowlevel
+from pydantic import BaseModel
+
+from halyard.core.axes import AxisRegistry, ScopeKey
+from halyard.core.clock import Clock, SystemClock
+from halyard.core.component import AComponent, Criticality, Descriptor, HealthStatus, Lifetime
+from halyard.core.component.settings import POLICY_FIELD
+from halyard.core.context import InvocationContext, use_context
+from halyard.core.errors import (
+    ComponentUnavailable,
+    ConfigurationError,
+    DefaultErrorClassifier,
+    ErrorClassifier,
+    StartupError,
+)
+from halyard.core.outcome import Outcome
+from halyard.core.pipeline.chain import DEFAULT_ORDER, build_chain
+from halyard.core.pipeline.interceptor import Next
+from halyard.core.pipeline.state import InMemoryStateStore
+from halyard.core.telemetry.instrument import DEFAULT_CONFIG, TelemetryConfig, instrument
+
+from .endpoint import endpoint_axis, use_endpoint
+from .graph import DependencyGraph, GraphNode
+from .health import Readiness, aggregate_readiness
+from .links import BUILTIN_LINK_BUILDERS
+from .registry import Registry
+
+
+def _first_leaf(exc: BaseException) -> BaseException:
+    """Unwrap a (Base)ExceptionGroup to its first leaf exception."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
+
+
+@dataclass(frozen=True)
+class _Registration:
+    name: str
+    cls: type[AComponent[Any, Any, Any]]
+    descriptor: Descriptor
+    config: BaseModel
+
+
+class Container:
+    """A configured, runnable set of components and their pipelines."""
+
+    def __init__(
+        self,
+        registrations: Mapping[str, _Registration],
+        graph: DependencyGraph,
+        *,
+        clock: Clock,
+        classifier: ErrorClassifier,
+        axes: AxisRegistry,
+        tracer_provider: Any,
+        meter_provider: Any,
+        telemetry: TelemetryConfig,
+        init_timeout: float,
+        drain_timeout: float,
+        health_timeout: float,
+        scoped_max_entries: int,
+    ) -> None:
+        self._registrations = dict(registrations)
+        self._graph = graph
+        self._clock = clock
+        self._classifier = classifier
+        self._axes = axes
+        self._tracer_provider = tracer_provider
+        self._meter_provider = meter_provider
+        self._telemetry = telemetry
+        self._init_timeout = init_timeout
+        self._drain_timeout = drain_timeout
+        self._health_timeout = health_timeout
+        self._link_store = InMemoryStateStore(max_entries=scoped_max_entries)
+        self._scoped_stores: dict[str, InMemoryStateStore] = {}
+        self._scoped_max_entries = scoped_max_entries
+        self._process: dict[str, AComponent[Any, Any, Any]] = {}
+        self._process_chains: dict[tuple[str, str], Next] = {}
+        self._degraded: set[str] = set()
+        self._active_calls = 0
+        self._started = False
+
+    # --- construction --------------------------------------------------------
+
+    @classmethod
+    def build(
+        cls,
+        registry: Registry,
+        configs: Mapping[str, Mapping[str, Any]],
+        *,
+        clock: Clock | None = None,
+        classifier: ErrorClassifier | None = None,
+        axes: AxisRegistry | None = None,
+        tracer_provider: Any = None,
+        meter_provider: Any = None,
+        telemetry: TelemetryConfig = DEFAULT_CONFIG,
+        init_timeout: float = 30.0,
+        drain_timeout: float = 30.0,
+        health_timeout: float = 5.0,
+        scoped_max_entries: int = 1000,
+    ) -> "Container":
+        """Validate configs and the dependency graph; return an unstarted container."""
+        axes = axes or AxisRegistry()
+        with contextlib.suppress(ConfigurationError):
+            axes.register(endpoint_axis())  # tolerate a caller-registered endpoint axis
+
+        registrations: dict[str, _Registration] = {}
+        for name, raw in configs.items():
+            component_cls = registry.get(name)
+            descriptor = registry.descriptor(name)
+            config = descriptor.config_model.model_validate(dict(raw))
+            registrations[name] = _Registration(name, component_cls, descriptor, config)
+
+        graph = DependencyGraph(
+            {
+                name: GraphNode(name, reg.descriptor.dependencies, reg.descriptor.lifetime)
+                for name, reg in registrations.items()
+            }
+        )
+        return cls(
+            registrations,
+            graph,
+            clock=clock or SystemClock(),
+            classifier=classifier or DefaultErrorClassifier(),
+            axes=axes,
+            tracer_provider=tracer_provider,
+            meter_provider=meter_provider,
+            telemetry=telemetry,
+            init_timeout=init_timeout,
+            drain_timeout=drain_timeout,
+            health_timeout=health_timeout,
+            scoped_max_entries=scoped_max_entries,
+        )
+
+    # --- lifecycle -----------------------------------------------------------
+
+    async def start(self) -> None:
+        """Start process components in dependency order; scoped ones stay lazy."""
+        if self._started:
+            return
+        for name, reg in self._registrations.items():
+            if reg.descriptor.lifetime is Lifetime.SCOPED:
+                self._scoped_stores[name] = InMemoryStateStore(max_entries=self._scoped_max_entries)
+        try:
+            for layer in self._graph.startup_layers():
+                names = [n for n in layer if self._registrations[n].descriptor.lifetime is Lifetime.PROCESS]
+                async with anyio.create_task_group() as tg:
+                    for name in names:
+                        tg.start_soon(self._start_process, name)
+        except BaseException as exc:
+            await self._stop_process_instances()
+            # A task group reports child failures as a (Base)ExceptionGroup;
+            # surface the underlying error so callers see StartupError directly.
+            raise _first_leaf(exc) from None
+
+        for name, reg in self._registrations.items():
+            if reg.descriptor.lifetime is Lifetime.PROCESS and name in self._process:
+                for method in reg.descriptor.invocables:
+                    self._process_chains[(name, method)] = self._build_chain(self._process[name], reg, method)
+        self._started = True
+
+    async def _start_process(self, name: str) -> None:
+        reg = self._registrations[name]
+        instance = self._construct(reg)
+        instance.bind_dependencies({d: self._process[d] for d in reg.descriptor.dependencies if d in self._process})
+        try:
+            with anyio.fail_after(self._init_timeout):
+                await instance.start()
+        except Exception as exc:
+            if reg.descriptor.criticality is Criticality.REQUIRED:
+                raise StartupError(f"required component '{name}' failed to start: {exc}") from exc
+            self._degraded.add(name)
+            return
+        self._process[name] = instance
+
+    async def stop(self) -> None:
+        """Drain active calls, then stop everything in reverse dependency order."""
+        if not self._started:
+            return
+        with anyio.move_on_after(self._drain_timeout):
+            while self._active_calls > 0:
+                await anyio.lowlevel.checkpoint()  # yield so in-flight calls finish
+        await self._stop_process_instances()
+        for store in self._scoped_stores.values():
+            await store.close()
+        self._scoped_stores.clear()
+        await self._link_store.close()
+        self._started = False
+
+    async def _stop_process_instances(self) -> None:
+        for name in self._graph.shutdown_order():
+            instance = self._process.pop(name, None)
+            if instance is None:
+                continue
+            with anyio.move_on_after(self._drain_timeout):
+                await instance.stop()
+        self._process_chains.clear()
+
+    # --- invocation ----------------------------------------------------------
+
+    async def invoke(
+        self, component: str, method: str, *, correlation_id: str | None = None, **arguments: Any
+    ) -> Outcome[Any]:
+        """Invoke a component's method through its policy chain and telemetry."""
+        if not self._started:
+            raise ConfigurationError("container is not started")
+        reg = self._registration(component)
+        if method not in reg.descriptor.invocables:
+            raise ConfigurationError(f"component '{component}' has no invocable '{method}'")
+
+        if reg.descriptor.lifetime is Lifetime.PROCESS:
+            instance = self._process.get(component)
+            if instance is None:
+                raise ComponentUnavailable(f"component '{component}' is degraded")
+            chain = self._process_chains[(component, method)]
+            scope_key: ScopeKey = (("component", component),)
+        else:
+            instance, scope_key = await self._scoped_instance(component)
+            chain = self._build_chain(instance, reg, method)
+
+        ctx = InvocationContext(
+            operation=f"{component}.{method}",
+            correlation_id=correlation_id or uuid.uuid4().hex,
+            arguments=dict(arguments),
+            scope_key=scope_key,
+            clock=self._clock,
+        )
+        endpoint = instance.endpoint() or instance.identity.uid
+        self._active_calls += 1
+        try:
+            with use_endpoint(endpoint), use_context(ctx):
+                return await chain(ctx)
+        finally:
+            self._active_calls -= 1
+
+    async def _scoped_instance(self, component: str) -> tuple[AComponent[Any, Any, Any], ScopeKey]:
+        reg = self._registrations[component]
+        scope_key = self._axes.resolve(reg.descriptor.scope)
+        deps = await self._resolve_dependencies(reg.descriptor.dependencies)
+        store = self._scoped_stores[component]
+
+        def factory() -> AComponent[Any, Any, Any]:
+            instance = self._construct(reg)
+            instance.bind_dependencies(deps)
+            return instance
+
+        instance = await store.get_or_create(scope_key, factory)
+        return instance, scope_key
+
+    async def _resolve_dependencies(self, names: tuple[str, ...]) -> dict[str, AComponent[Any, Any, Any]]:
+        resolved: dict[str, AComponent[Any, Any, Any]] = {}
+        for name in names:
+            reg = self._registrations[name]
+            if reg.descriptor.lifetime is Lifetime.PROCESS:
+                if name in self._process:
+                    resolved[name] = self._process[name]
+            else:
+                instance, _ = await self._scoped_instance(name)
+                resolved[name] = instance
+        return resolved
+
+    # --- wiring --------------------------------------------------------------
+
+    def _registration(self, component: str) -> _Registration:
+        try:
+            return self._registrations[component]
+        except KeyError:
+            raise ConfigurationError(f"component '{component}' is not configured") from None
+
+    def _construct(self, reg: _Registration) -> AComponent[Any, Any, Any]:
+        own = reg.descriptor.settings_model
+        if own is None:
+            return reg.cls(reg.config)
+        settings = own.model_validate(reg.config.model_dump(exclude={POLICY_FIELD}))
+        return reg.cls(settings)
+
+    def _build_chain(self, instance: AComponent[Any, Any, Any], reg: _Registration, method: str) -> Next:
+        spec = reg.descriptor.invocables[method]
+        # Order comes from the deployment config's chain; the method's effective
+        # policy restricts which links are allowed (so e.g. health, pinned to
+        # ("timeout",), is never retried even if the config lists retry); a link
+        # is active only when it also has settings.
+        config_policy = getattr(reg.config, POLICY_FIELD, None)
+        config_chain = getattr(config_policy, "chain", None) or DEFAULT_ORDER
+        allowed = set(spec.policy.chain)
+        factories = []
+        for link in config_chain:
+            if link not in allowed:
+                continue
+            builder = BUILTIN_LINK_BUILDERS.get(link)
+            if builder is None:
+                continue  # a link named in the chain but not implemented yet
+            settings = self._link_settings(reg.config, link, spec.policy.overrides.get(link, {}))
+            if settings is None:
+                continue  # link not configured for this component: inactive
+            factories.append(builder(settings, self._clock, self._classifier))
+        base = self._make_base(instance, spec.method_name)
+        chain = build_chain(factories, self._link_store, self._axes, base)
+        return instrument(
+            chain,
+            clock=self._clock,
+            tracer_provider=self._tracer_provider,
+            meter_provider=self._meter_provider,
+            config=self._telemetry,
+        )
+
+    @staticmethod
+    def _link_settings(config: BaseModel, link: str, override: Mapping[str, Any]) -> BaseModel | None:
+        policy = getattr(config, POLICY_FIELD, None)
+        base: BaseModel | None = getattr(policy, link, None) if policy is not None else None
+        if base is None:
+            return None
+        if not override:
+            return base
+        merged = {**base.model_dump(), **override}
+        return type(base).model_validate(merged)
+
+    def _make_base(self, instance: AComponent[Any, Any, Any], method_name: str) -> Next:
+        method = getattr(instance, method_name)
+        hints = get_type_hints(method)
+        ctx_param = next(
+            (name for name in inspect.signature(method).parameters if hints.get(name) is InvocationContext),
+            None,
+        )
+
+        async def base(ctx: InvocationContext) -> Outcome[Any]:
+            kwargs = dict(ctx.arguments or {})
+            if ctx_param is not None:
+                kwargs[ctx_param] = ctx
+            result = await method(**kwargs)
+            return result if isinstance(result, Outcome) else Outcome(value=result)
+
+        return base
+
+    # --- health --------------------------------------------------------------
+
+    async def liveness(self) -> HealthStatus:
+        """Is the process up? Dependencies are not consulted."""
+        return HealthStatus.ok() if self._started else HealthStatus.unhealthy("not started")
+
+    async def readiness(self) -> Readiness:
+        """Can the system serve? Required components must be healthy."""
+        own = {name: await self._component_status(name) for name in self._registrations}
+        dependencies = {name: reg.descriptor.dependencies for name, reg in self._registrations.items()}
+        criticality = {name: reg.descriptor.criticality for name, reg in self._registrations.items()}
+        return aggregate_readiness(dependencies, criticality, own)
+
+    async def _component_status(self, name: str) -> HealthStatus:
+        reg = self._registrations[name]
+        if reg.descriptor.lifetime is Lifetime.SCOPED:
+            return HealthStatus.ok()  # created on demand; nothing running to poll
+        if name in self._degraded:
+            return HealthStatus.degraded("failed to start")
+        instance = self._process.get(name)
+        if instance is None:
+            return HealthStatus.unhealthy("not running")
+        try:
+            with anyio.fail_after(self._health_timeout):
+                return await instance.health()  # via timeout only, not the full chain
+        except Exception:
+            return HealthStatus.unhealthy("health check failed")
+
+    # --- introspection -------------------------------------------------------
+
+    @property
+    def started(self) -> bool:
+        return self._started
+
+    def is_degraded(self, name: str) -> bool:
+        return name in self._degraded

@@ -5,3 +5,4 @@
 - `httpx_handrolled.py` - the same resilient call without the framework, for comparison.
 - `component_descriptor.py` - a component, its descriptor and settings JSON Schema.
 - `telemetry_console.py` - the instrumented chain printing spans and metrics to the console.
+- `composition_container.py` - registering components and driving them through a container.

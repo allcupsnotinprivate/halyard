@@ -25,6 +25,14 @@ class ConfigurationError(PermanentError):
     """Invalid configuration; handled at startup, never retried."""
 
 
+class StartupError(FrameworkError):
+    """A required component failed to initialize; the system cannot start."""
+
+
+class ComponentUnavailable(TransientError):
+    """A component was asked for but is not available (e.g. degraded at start)."""
+
+
 class DeadlineExceeded(TransientError):
     """Overall deadline for the invocation is exhausted."""
 
