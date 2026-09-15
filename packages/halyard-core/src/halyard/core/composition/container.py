@@ -15,6 +15,7 @@ that talk to the same endpoint.
 from collections.abc import Callable, Coroutine, Mapping
 import contextlib
 from dataclasses import dataclass
+import logging
 from typing import Any, TypeVar, cast
 import uuid
 
@@ -65,6 +66,8 @@ from .registry import Registry
 from .wiring import active_links, make_base, method_factories
 
 C = TypeVar("C", bound=AComponent[Any, Any, Any])
+
+logger = logging.getLogger(__name__)
 
 
 def _first_leaf(exc: BaseException) -> BaseException:
@@ -249,6 +252,7 @@ class Container:
                 for method in reg.descriptor.invocables:
                     self._process_chains[(name, method)] = self._build_chain(self._process[name], name, method, config)
         self._started = True
+        logger.info("container started: %d component(s), %d degraded", len(self._registrations), len(self._degraded))
 
     async def _start_process(self, name: str) -> None:
         reg = self._registrations[name]
@@ -260,14 +264,18 @@ class Container:
         except Exception as exc:
             if reg.descriptor.criticality is Criticality.REQUIRED:
                 raise StartupError(f"required component '{name}' failed to start: {exc}") from exc
+            # Optional component: we swallow the failure, so it must be logged.
+            logger.warning("optional component %r degraded: failed to start: %s", name, exc)
             self._degraded.add(name)
             return
         self._process[name] = instance
+        logger.debug("started component %r", name)
 
     async def stop(self) -> None:
         """Drain active calls, then stop everything in reverse dependency order."""
         if not self._started:
             return
+        logger.info("container stopping")
         with anyio.move_on_after(self._drain_timeout):
             while self._active_calls > 0:
                 await anyio.lowlevel.checkpoint()  # yield so in-flight calls finish
