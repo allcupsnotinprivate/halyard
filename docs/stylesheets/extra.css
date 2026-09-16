@@ -67,22 +67,6 @@
   border-bottom: 2px solid var(--md-accent-fg-color);
 }
 
-/* ---- Brand logo: circular in the header ------------------- */
-.md-header__button.md-logo img,
-.md-header__button.md-logo svg {
-  border-radius: 50%;
-}
-
-/* ---- Home hero logo: square with rounded corners ---------- */
-.md-typeset .ww-logo {
-  display: block;
-  margin: 0 auto 1.5rem;
-  width: 180px;
-  max-width: 60%;
-  height: auto;
-  border-radius: 22px;
-}
-
 /* ---- API reference (mkdocstrings): clearer object breaks -- */
 .md-typeset .doc-heading {
   border-top: 1px solid var(--md-default-fg-color--lightest);
