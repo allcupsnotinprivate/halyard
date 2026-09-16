@@ -7,10 +7,12 @@ directly::
 
 The internal layers remain importable (``warpweft.core.*``, ``warpweft.runtime.*``)
 and a few focused surfaces have their own module: `warpweft.formats` (field
-formats), `warpweft.testing` (testing helpers), and `warpweft.mcp`
-(Model Context Protocol tools, available with the ``mcp`` extra).
+formats), `warpweft.testing` (testing helpers), `warpweft.actions`
+(actions and providers), and `warpweft.mcp` (Model Context Protocol tools,
+available with the ``mcp`` extra).
 """
 
+from warpweft.actions import Action, ActionParams, Provider
 from warpweft.core import __version__
 from warpweft.core.axes import Axis, AxisRegistry, ScopeKey, ScopeSpec
 from warpweft.core.clock import Clock, ManualClock, SystemClock
@@ -53,6 +55,8 @@ from warpweft.runtime import App, AxisHandle, autodiscover, component, default_r
 
 __all__ = [
     "AComponent",
+    "Action",
+    "ActionParams",
     "App",
     "AttemptTimeout",
     "Axis",
@@ -80,6 +84,7 @@ __all__ = [
     "Outcome",
     "PermanentError",
     "Policy",
+    "Provider",
     "Readiness",
     "Registry",
     "RetryExhausted",

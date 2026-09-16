@@ -30,6 +30,10 @@ annotation hints `read_only`, `destructive`, `idempotent`, `open_world`. A
 `@tool` on a method that is not `@invocable` is rejected when the server is
 built.
 
+An [action](actions.md) is marked automatically - its `execute` is a tool by
+default (opt out with `entrypoint = False`), from class-level metadata - so you
+rarely write `@tool` yourself.
+
 ## Serving
 
 ```python

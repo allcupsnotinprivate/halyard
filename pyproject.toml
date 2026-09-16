@@ -1,11 +1,29 @@
 [project]
 name = "warpweft"
-version = "0.1.0"
+version = "0.2.0"
 description = "A declarative framework for resilient, observable service components."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{ name = "allcupsnotinprivate" }]
+keywords = ["async", "anyio", "resilience", "observability", "opentelemetry", "mcp", "framework"]
+# NOTE: the "Programming Language :: Python :: 3.x" classifiers below drive the
+# PyPI "pyversions" badge; without them shields.io renders it as "missing".
+# License is declared via the SPDX expression above, so no "License ::" classifier.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
 dependencies = [
     "anyio>=4",
     "pydantic>=2.7,<3",

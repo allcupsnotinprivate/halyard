@@ -66,7 +66,11 @@ plugins:
 
 markdown_extensions:
   - admonition
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.details
   - pymdownx.highlight: { anchor_linenums: true }
   - toc: { permalink: true }
@@ -78,6 +82,7 @@ nav:
   - Guides:
       - Runtime: runtime.md
       - Composition: composition.md
+      - Actions & providers: actions.md
       - Field formats: formats.md
       - Telemetry: telemetry.md
       - Logging: logging.md

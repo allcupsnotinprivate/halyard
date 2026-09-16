@@ -13,6 +13,7 @@ from typing import Any, get_type_hints
 from pydantic import BaseModel
 
 from warpweft.core.clock import Clock
+from warpweft.core.component.invocable import InvocableSpec
 from warpweft.core.component.policy import EffectivePolicy
 from warpweft.core.component.settings import POLICY_FIELD
 from warpweft.core.context import InvocationContext
@@ -58,22 +59,25 @@ def method_factories(
     return [BUILTIN_LINK_BUILDERS[link](settings, clock, classifier) for link, settings in active_links(config, policy)]
 
 
-def make_base(instance: object, method_name: str) -> Next:
+def make_base(instance: object, spec: InvocableSpec) -> Next:
     """Wrap a bound method as a base call: bind arguments, inject context, wrap result.
 
-    Arguments come from ``ctx.arguments``; if the method declares an
-    ``InvocationContext`` parameter it receives the context; a raw return value
-    is wrapped in an `Outcome`.
+    The invocable's ``arg_binder`` maps ``ctx.arguments`` (the caller-facing input
+    fields) to the method's keyword arguments - the default passes them through,
+    a custom binding rebuilds a richer shape. If the method declares an
+    ``InvocationContext`` parameter it also receives the context, and a raw return
+    value is wrapped in an `Outcome`.
     """
-    method = getattr(instance, method_name)
+    method = getattr(instance, spec.method_name)
     hints = get_type_hints(method)
     ctx_param = next(
         (name for name in inspect.signature(method).parameters if hints.get(name) is InvocationContext),
         None,
     )
+    bind = spec.arg_binder
 
     async def base(ctx: InvocationContext) -> Outcome[Any]:
-        kwargs = dict(ctx.arguments or {})
+        kwargs = bind(ctx.arguments or {})
         if ctx_param is not None:
             kwargs[ctx_param] = ctx
         result = await method(**kwargs)

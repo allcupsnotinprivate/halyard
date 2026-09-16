@@ -76,7 +76,7 @@ async def drive(
     spec = describe(type(component)).invocables[method]
     policy = dict((config or {}).get("policy", {}))
     endpoint = component.endpoint() or component.identity.uid
-    base = make_base(component, method)
+    base = make_base(component, spec)
     return await _run(
         policy,
         spec.policy,
