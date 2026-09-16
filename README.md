@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo-rounded.png" alt="warpweft" width="180">
+</p>
+
 # warpweft
 
 A declarative framework for building resilient, observable service components in

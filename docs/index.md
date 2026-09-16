@@ -1,3 +1,5 @@
+<img class="ww-logo" src="assets/logo-rounded.png" alt="Warpweft logo">
+
 # Warpweft
 
 A declarative framework for building **resilient, observable service
