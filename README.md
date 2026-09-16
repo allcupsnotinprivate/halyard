@@ -1,16 +1,35 @@
-<p align="center">
-  <img src="docs/assets/logo-rounded.png" alt="warpweft" width="180">
-</p>
-
 # warpweft
 
-A declarative framework for building resilient, observable service components in
-async Python. You write a component's *calls*; warpweft wraps every call with
-retry, timeout, circuit breaking, caching, concurrency limiting and telemetry -
-driven by configuration, not boilerplate.
+<p align="center">
+  <em>A declarative framework for resilient, observable service components in async Python.</em>
+</p>
 
-Async-only, built on [anyio](https://anyio.readthedocs.io/) (runs on asyncio and
-trio). Typed throughout (`mypy --strict`).
+<p align="center">
+  <a href="https://pypi.org/project/warpweft/"><img src="https://img.shields.io/pypi/v/warpweft.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/warpweft/"><img src="https://img.shields.io/pypi/pyversions/warpweft.svg" alt="Supported Python versions"></a>
+  <a href="https://github.com/allcupsnotinprivate/warpweft/actions/workflows/ci.yml"><img src="https://github.com/allcupsnotinprivate/warpweft/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://allcupsnotinprivate.github.io/warpweft/"><img src="https://img.shields.io/badge/docs-online-4c9aff.svg" alt="Documentation"></a>
+  <a href="https://opensource.org/license/apache-2-0"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+</p>
+
+You write a component's *calls*; warpweft wraps every call with retry, timeout,
+circuit breaking, caching, concurrency limiting and telemetry - driven by
+configuration, not boilerplate. Async-only, built on
+[anyio](https://anyio.readthedocs.io/) (runs on asyncio and trio) and typed
+throughout (`mypy --strict`).
+
+## Features
+
+- **Resilience, declared** - retry, timeout, circuit breaker, caching,
+  concurrency limiting and graceful degradation wrap every call, driven by config.
+- **Observable by default** - OpenTelemetry spans and metrics with consistent
+  semantic conventions.
+- **Composition** - a component registry, dependency-injection container,
+  dependency graph, lifecycle and health checks.
+- **Config-driven** - policies from environment, TOML or YAML; no per-call
+  boilerplate.
+- **LLM-ready** - expose invocables as Model Context Protocol tools.
+- **Async & typed** - built on anyio (asyncio and trio), `mypy --strict` throughout.
 
 ## Install
 
@@ -55,12 +74,8 @@ as `warpweft.core.*` and `warpweft.runtime.*`.
 
 ## Documentation
 
-- [Write your first component](docs/first-component.md) - from nothing to a tested component.
-- [Runtime](docs/runtime.md) - the App, `@component`, autodiscovery, config and the lifespan.
-- [Composition](docs/composition.md) - registry, container, dependency graph, lifecycle, axes, health.
-- [Telemetry](docs/telemetry.md) - spans, metrics and the semantic conventions.
-- [Logging](docs/logging.md) - the library logging convention.
-- [MCP tools](docs/mcp.md) - exposing invocables to LLMs.
+Full documentation - getting started, guides and the auto-generated API
+reference - lives at **https://allcupsnotinprivate.github.io/warpweft/**.
 
 ## Requirements
 
@@ -79,4 +94,4 @@ uv run ruff format --check .    # formatter
 uv run mypy src                 # type checking
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the commit format, DCO and checks.
+See `CONTRIBUTING.md` in the repository for the commit format, DCO and checks.

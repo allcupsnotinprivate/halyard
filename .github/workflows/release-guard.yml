@@ -1,8 +1,10 @@
 name: Release guard
 
-# Runs on every PR into main: makes sure the version in pyproject.toml is
-# releasable BEFORE merge, so the post-merge publish can never fail on a
-# duplicate/invalid version.
+# Runs on every PR into main. If the PR bumps the version to a NEW release
+# (no matching tag yet), validate it so the post-merge publish can't fail.
+# If the version is unchanged — a docs/chore/fix PR that doesn't cut a
+# release — the checks are skipped and the job passes: merging just won't
+# publish anything (release.yml sees the existing tag and no-ops).
 on:
   pull_request:
     branches: [main]
@@ -17,20 +19,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # need tags for the monotonicity check
+          fetch-depth: 0 # need tags to know what's already released
 
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
 
-      - name: Read version from pyproject.toml
+      - name: Read version; is it a new release?
         id: ver
         run: |
           v=$(uv run --no-project python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "pyproject version: $v"
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "is_new=false" >> "$GITHUB_OUTPUT"
+            echo "Version $v already has tag v$v — no release on merge; nothing to validate."
+          else
+            echo "is_new=true" >> "$GITHUB_OUTPUT"
+            echo "Version $v has no tag yet — validating it as a candidate release."
+          fi
 
-      - name: Valid PEP 440 and not older than the latest tag
+      - name: Valid PEP 440 and greater than the latest tag
+        if: steps.ver.outputs.is_new == 'true'
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
@@ -50,15 +59,13 @@ jobs:
           ).stdout.splitlines()
           if tags:
               old = Version(tags[0][1:])
-              if new < old:
-                  sys.exit(f"::error::Version {new} is lower than the latest tag {old}.")
-              if new == old:
-                  print(f"Version unchanged ({new}); merging this PR will NOT publish a release.")
-                  raise SystemExit(0)
-          print(f"Version {new} looks releasable.")
+              if new <= old:
+                  sys.exit(f"::error::Version {new} must be greater than the latest release {old}.")
+          print(f"Version {new} is a valid new release.")
           PY
 
-      - name: Version not already published on PyPI
+      - name: Not already published on PyPI
+        if: steps.ver.outputs.is_new == 'true'
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
@@ -78,6 +85,7 @@ jobs:
           echo "Version $V is free on PyPI."
 
       - name: Build and validate package metadata
+        if: steps.ver.outputs.is_new == 'true'
         run: |
           uv build -o dist
           uvx twine check dist/*
