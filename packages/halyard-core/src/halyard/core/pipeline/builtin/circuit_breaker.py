@@ -19,6 +19,7 @@ call (after retries), not one attempt.
 
 from collections import deque
 from enum import StrEnum
+import logging
 
 import anyio
 from pydantic import BaseModel, Field, model_validator
@@ -31,6 +32,8 @@ from halyard.core.observe import ATTR_BREAKER_STATE, EVENT_BREAKER_REJECTED, obs
 from halyard.core.outcome import Outcome
 from halyard.core.pipeline.interceptor import Interceptor, Next
 from halyard.core.unit import Identity
+
+logger = logging.getLogger(__name__)
 
 #: The breaker's state is sliced per endpoint. The axis itself is registered
 #: where the pipeline is wired to components; the slice is declared here.
@@ -143,11 +146,13 @@ class CircuitBreakerInterceptor:
         self._opened_at = self._clock.monotonic()
         self._window.clear()
         self._probe_in_flight = False
+        logger.warning("circuit breaker %r opened", self.identity.uid)
 
     def _close(self) -> None:
         self._state = CircuitState.CLOSED
         self._window.clear()
         self._probe_in_flight = False
+        logger.info("circuit breaker %r closed", self.identity.uid)
 
 
 class CircuitBreakerFactory:
