@@ -10,7 +10,7 @@ Two distinct things, deliberately not merged:
 - **`Registry`** - which component types exist. Registration is explicit (the
   `@registry.register` decorator or `registry.register(cls)`), never an import
   side effect. Third-party components are discovered through entry points
-  (group `halyard.components`). Registering builds and caches the descriptor, so
+  (group `warpweft.components`). Registering builds and caches the descriptor, so
   a malformed component fails at registration. Component names derive from the
   class name (`SearchService` → `search_service`) unless set explicitly, and
   dependencies may be declared as typed class annotations (see
@@ -28,7 +28,7 @@ container = Container.build(
     },
 )
 await container.start()
-outcome = await container.invoke("search", "query", text="halyard")
+outcome = await container.invoke("search", "query", text="warpweft")
 await container.stop()
 ```
 

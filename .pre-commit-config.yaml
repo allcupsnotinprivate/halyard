@@ -32,7 +32,7 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: bash -c 'uv run --all-packages mypy $(find packages -maxdepth 3 -name src -type d 2>/dev/null)'
+        entry: uv run mypy src
         language: system
         types: [python]
         pass_filenames: false

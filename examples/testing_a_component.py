@@ -1,6 +1,6 @@
 """Runnable demo of the testing helpers.
 
-Shows both testing modes from ``halyard.core.testing``:
+Shows both testing modes from ``warpweft.core.testing``:
   * ``drive`` - a real component through its real chain, with an injected fake
     that fails twice then succeeds; retry recovers with zero real delay;
   * ``drive_policy`` - a scripted scenario against a policy, no component needed.
@@ -14,9 +14,8 @@ from typing import Any, Protocol
 import anyio
 from pydantic import BaseModel
 
-from halyard.core.component import AComponent, invocable
-from halyard.core.errors import TransientError
-from halyard.core.testing import InstantClock, drive, drive_policy, fails_then_succeeds
+from warpweft import AComponent, TransientError, invocable
+from warpweft.testing import InstantClock, drive, drive_policy, fails_then_succeeds
 
 
 class Client(Protocol):

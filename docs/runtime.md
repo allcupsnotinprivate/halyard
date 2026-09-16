@@ -1,4 +1,4 @@
-# Runtime (halyard-runtime)
+# Runtime
 
 The application layer over the core: one `App` object owns the registry, the
 configuration and the container lifecycle. The core stays explicit and
@@ -7,7 +7,7 @@ instance-scoped; the runtime adds the convenient defaults an application wants.
 ## Declaring components
 
 ```python
-from halyard.runtime import App, component
+from warpweft import App, component
 
 
 @component  # module-level: registers into the default registry
@@ -48,7 +48,7 @@ metaclass auto-registration: subclassing is not intent to register.
 
 ```python
 app = App(
-    config_file="halyard.toml",  # .toml / .json / .yaml (yaml via the extra)
+    config_file="warpweft.toml",  # .toml / .json / .yaml (yaml via the extra)
     config={"weather": {"policy": {"retry": {...}}}},
     dotenv=".env",  # optional
     env_prefix="MYAPP",  # highest layer
@@ -71,7 +71,7 @@ Env values arrive as strings and are coerced by the core's validation. Env vars
 mapping to no component field are ignored. Every registered component is
 included in the container - an absent config section means "all defaults".
 
-YAML support needs the extra: `pip install halyard-runtime[yaml]`.
+YAML support needs the extra: `pip install warpweft[yaml]`.
 
 All `Container.build` options (classifier, telemetry providers,
 `framework_defaults`, a `SettingsResolver`, timeouts) pass through `App(...)`.
@@ -151,19 +151,19 @@ Pass a `shutdown` event to drive it from your own code instead of signals.
 
 ## Command line
 
-Installing `halyard-runtime` provides a `halyard` command that inspects and
+Warpweft provides a `warpweft` command that inspects and
 validates an app **offline** - it builds and validates the container but never
 starts it, so no component, client or pool is touched. Point it at your App by
-import path (`module:attribute`, like uvicorn), or set `HALYARD_APP`:
+import path (`module:attribute`, like uvicorn), or set `WARPWEFT_APP`:
 
 ```
-halyard check   --app myapp.main:app     # validate config + graph (exit 1 on error) - for CI
-halyard list    --app myapp.main:app     # registered components
-halyard describe [component] --app ...   # metadata, invocables, effective chains
-halyard explain <component> <method>     # a method's chain + where each setting came from
-halyard config  <component> --app ...    # resolved config, secrets masked
-halyard schema  <component> --app ...    # JSON Schema of the config model (editor autocomplete)
+warpweft check   --app myapp.main:app     # validate config + graph (exit 1 on error) - for CI
+warpweft list    --app myapp.main:app     # registered components
+warpweft describe [component] --app ...   # metadata, invocables, effective chains
+warpweft explain <component> <method>     # a method's chain + where each setting came from
+warpweft config  <component> --app ...    # resolved config, secrets masked
+warpweft schema  <component> --app ...    # JSON Schema of the config model (editor autocomplete)
 ```
 
-`--json` gives machine-readable output. `halyard check` is the CI gate: it
+`--json` gives machine-readable output. `warpweft check` is the CI gate: it
 fails with a non-zero exit and a field-path-and-source error on bad config.

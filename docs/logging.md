@@ -1,9 +1,9 @@
 # Logging
 
-Halyard follows the library convention: it **emits** through named loggers and
+Warpweft follows the library convention: it **emits** through named loggers and
 never **configures** logging. There is no `basicConfig`, no handler, no level
 set by default - that is the application's job. A `NullHandler` is attached to
-the `halyard` logger so records drop silently until you opt in.
+the `warpweft` logger so records drop silently until you opt in.
 
 Logging is deliberately sparse and complements telemetry rather than
 duplicating it: per-call detail lives in OpenTelemetry spans/metrics (see
@@ -13,8 +13,8 @@ breaker opening/closing).
 
 ## Logger names
 
-Loggers follow the module path under the `halyard` hierarchy, e.g.
-`halyard.core.composition.container`, `halyard.core.pipeline.builtin.circuit_breaker`.
+Loggers follow the module path under the `warpweft` hierarchy, e.g.
+`warpweft.core.composition.container`, `warpweft.core.pipeline.builtin.circuit_breaker`.
 Tune any branch independently.
 
 ## Turning it on
@@ -24,15 +24,15 @@ Standard `logging`:
 ```python
 import logging
 
-logging.getLogger("halyard").setLevel(logging.INFO)
+logging.getLogger("warpweft").setLevel(logging.INFO)
 logging.basicConfig()  # your handler/format
 
 # or per subsystem
-logging.getLogger("halyard.core.pipeline.builtin.circuit_breaker").setLevel(logging.WARNING)
+logging.getLogger("warpweft.core.pipeline.builtin.circuit_breaker").setLevel(logging.WARNING)
 ```
 
 Records propagate to whatever handlers your application attaches to the root
-(or to `halyard`) - the library plugs into your setup automatically, with no
+(or to `warpweft`) - the library plugs into your setup automatically, with no
 coupling.
 
 ## Turning it off
@@ -41,9 +41,9 @@ Off is the default (NullHandler, no level). To silence it even when the root is
 configured:
 
 ```python
-logging.getLogger("halyard").setLevel(logging.CRITICAL + 1)
+logging.getLogger("warpweft").setLevel(logging.CRITICAL + 1)
 # or
-logging.getLogger("halyard").disabled = True
+logging.getLogger("warpweft").disabled = True
 ```
 
 ## Correlation id in logs (opt-in)
@@ -53,15 +53,15 @@ id (set by the runtime per request, or via `use_correlation_id`) in your
 format string:
 
 ```python
-from halyard.core.logging import CorrelationIdFilter
+from warpweft.core.logging import CorrelationIdFilter
 
 handler = logging.StreamHandler()
 handler.addFilter(CorrelationIdFilter())  # adds record.correlation_id
 handler.setFormatter(logging.Formatter("%(correlation_id)s %(name)s: %(message)s"))
-logging.getLogger("halyard").addHandler(handler)
+logging.getLogger("warpweft").addHandler(handler)
 ```
 
-Halyard does not install the filter for you - it is a plain `logging.Filter`.
+Warpweft does not install the filter for you - it is a plain `logging.Filter`.
 
 ## Don't log secrets
 

@@ -18,16 +18,16 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Sync workspace (frozen)
-        run: uv sync --frozen --all-packages
+      - name: Sync (frozen)
+        run: uv sync --frozen
       - name: Lint
         run: |
           uv run ruff check .
           uv run ruff format --check .
       - name: Type-check
-        run: uv run --all-packages mypy $(find packages -maxdepth 3 -name src -type d)
+        run: uv run mypy src
       - name: Tests (coverage gate 90%)
-        run: uv run pytest --cov=halyard --cov-report=term
+        run: uv run pytest --cov=warpweft --cov-report=term
 
   wheel-smoke:
     name: wheel installs into clean venv
@@ -37,13 +37,15 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-      - name: Build wheels
-        run: |
-          uv build --package halyard-core -o dist
-          uv build --package halyard-runtime -o dist
-          uv build --package halyard-mcp -o dist
-      - name: Install into clean venv and import
+      - name: Build the wheel
+        run: uv build -o dist
+      - name: Install (base) into a clean venv and import
         run: |
           uv venv /tmp/smoke --python 3.11
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/python -c "import halyard.core, halyard.runtime, halyard.mcp; print(halyard.core.__version__)"
+          /tmp/smoke/bin/python -c "import warpweft; from warpweft import App, AComponent; print(warpweft.__version__)"
+      - name: Install with the mcp extra and import warpweft.mcp
+        run: |
+          uv venv /tmp/smoke-mcp --python 3.11
+          uv pip install --python /tmp/smoke-mcp/bin/python "warpweft[mcp] @ $(ls dist/*.whl)"
+          /tmp/smoke-mcp/bin/python -c "import warpweft.mcp; from warpweft.mcp import tool; print('mcp extra ok')"

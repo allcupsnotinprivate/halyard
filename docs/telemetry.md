@@ -1,6 +1,6 @@
 # Telemetry
 
-Halyard instruments every invocation with OpenTelemetry: one span per call,
+Warpweft instruments every invocation with OpenTelemetry: one span per call,
 child spans per retry attempt, and four metrics. This page is the **stability
 contract**: dashboards and alerts are built on these names, so renaming any
 span, event, attribute or metric listed here is a breaking change.
@@ -8,7 +8,7 @@ span, event, attribute or metric listed here is a breaking change.
 ## Design rules
 
 - **Not a link. Always outside, always on.** Telemetry wraps the assembled
-  chain from the outside (`halyard.core.telemetry.instrument.instrument`) and
+  chain from the outside (`warpweft.core.telemetry.instrument.instrument`) and
   is not part of the policy chain. A link inside the chain could not see a
   circuit-breaker rejection the call never reached, nor measure total latency
   with retries included. There is no setting to turn it off.
@@ -17,13 +17,13 @@ span, event, attribute or metric listed here is a breaking change.
   providers), every span and metric is a no-op costing microseconds. The
   collection switch belongs to the application, not to component settings.
 - **The pipeline is OTel-free.** Links emit through the neutral
-  `halyard.core.observe.Observer` seam found in the context `bag`; only the
-  `halyard.core.telemetry` package imports OpenTelemetry.
+  `warpweft.core.observe.Observer` seam found in the context `bag`; only the
+  `warpweft.core.telemetry` package imports OpenTelemetry.
 
 ## Enabling collection
 
 ```python
-from halyard.core.telemetry.instrument import instrument
+from warpweft.core.telemetry.instrument import instrument
 
 chain = build_chain([...], store, registry, base)
 wrapped = instrument(chain)  # uses OTel globals
@@ -42,8 +42,8 @@ one, `instrument` is a transparent pass-through. See
 
 | Span | Name | Attributes |
 |---|---|---|
-| Invocation | `ctx.operation` | start: `halyard.operation`, `halyard.correlation_id`, `halyard.axis.<name>` per scope pair; end: `halyard.source`, `halyard.degraded`, `halyard.attempts`, `halyard.cache` (if the cache link ran); on error: `halyard.error.class` |
-| Attempt | `halyard.attempt` | `halyard.attempt.number` (numbering starts at 1) |
+| Invocation | `ctx.operation` | start: `warpweft.operation`, `warpweft.correlation_id`, `warpweft.axis.<name>` per scope pair; end: `warpweft.source`, `warpweft.degraded`, `warpweft.attempts`, `warpweft.cache` (if the cache link ran); on error: `warpweft.error.class` |
+| Attempt | `warpweft.attempt` | `warpweft.attempt.number` (numbering starts at 1) |
 
 A successful span keeps status `UNSET` (per OTel spec, instrumentation does
 not set `OK`). A failing span gets status `ERROR` and an `exception` event -
@@ -53,19 +53,19 @@ including each failed attempt span, not just the invocation.
 
 | Event | Emitted by | Attributes |
 |---|---|---|
-| `halyard.retry.backoff` | retry, right before the backoff sleep (lands on the invocation span) | `halyard.backoff.delay` (seconds), `halyard.attempt.number` (upcoming attempt) |
-| `halyard.circuit_breaker.rejected` | circuit breaker, on rejecting a call | `halyard.circuit_breaker.state` = `open` \| `half_open` |
+| `warpweft.retry.backoff` | retry, right before the backoff sleep (lands on the invocation span) | `warpweft.backoff.delay` (seconds), `warpweft.attempt.number` (upcoming attempt) |
+| `warpweft.circuit_breaker.rejected` | circuit breaker, on rejecting a call | `warpweft.circuit_breaker.state` = `open` \| `half_open` |
 
 ## Metrics
 
 | Metric | Instrument | Unit | Attributes | Axis values |
 |---|---|---|---|---|
-| `halyard.calls` | Counter | `{call}` | `halyard.operation`, `halyard.status` (`ok`/`error`), `halyard.source`, `halyard.degraded`; `halyard.error.class` when status=`error` | when status=`error`, or allowlisted |
-| `halyard.call.duration` | Histogram | `s` | `halyard.operation`, `halyard.status` | only allowlisted |
-| `halyard.degradations` | Counter | `{call}` | `halyard.operation` | always |
-| `halyard.circuit_breaker.rejections` | Counter | `{rejection}` | `halyard.operation`, `halyard.circuit_breaker.state` | always |
+| `warpweft.calls` | Counter | `{call}` | `warpweft.operation`, `warpweft.status` (`ok`/`error`), `warpweft.source`, `warpweft.degraded`; `warpweft.error.class` when status=`error` | when status=`error`, or allowlisted |
+| `warpweft.call.duration` | Histogram | `s` | `warpweft.operation`, `warpweft.status` | only allowlisted |
+| `warpweft.degradations` | Counter | `{call}` | `warpweft.operation` | always |
+| `warpweft.circuit_breaker.rejections` | Counter | `{rejection}` | `warpweft.operation`, `warpweft.circuit_breaker.state` | always |
 
-`halyard.circuit_breaker.rejections` counts every rejection **at the moment
+`warpweft.circuit_breaker.rejections` counts every rejection **at the moment
 the breaker rejects**, not when an exception escapes: an outer retry may
 recover from a rejection, and a degradation stub may swallow it - the counter
 still moves.
