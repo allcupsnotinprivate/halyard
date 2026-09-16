@@ -13,6 +13,11 @@ dependencies = [
     "opentelemetry-api>=1.26,<2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/allcupsnotinprivate/warpweft"
+Repository = "https://github.com/allcupsnotinprivate/warpweft"
+Issues = "https://github.com/allcupsnotinprivate/warpweft/issues"
+
 [project.optional-dependencies]
 # Expose component invocables as Model Context Protocol tools (warpweft.mcp).
 mcp = ["mcp>=2.2,<3"]
