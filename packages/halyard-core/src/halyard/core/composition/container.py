@@ -504,6 +504,16 @@ class Container:
         self._registration(component)
         return self._assemble(component, scope_key).model_dump()
 
+    def config_json(self, component: str, *, scope_key: ScopeKey = GLOBAL_SCOPE) -> dict[str, Any]:
+        """The resolved config as a JSON-safe dict, with secrets masked.
+
+        Uses pydantic's JSON mode, so ``SecretStr`` fields render as
+        ``**********`` and enums/dates become primitives - safe to print or
+        serialize (unlike :meth:`resolved_settings`, which keeps live objects).
+        """
+        self._registration(component)
+        return self._assemble(component, scope_key).model_dump(mode="json")
+
     def snapshot(self) -> RuntimeSnapshot:
         """A point-in-time view of breaker states, concurrency and live slices."""
         breakers: list[BreakerSnapshot] = []

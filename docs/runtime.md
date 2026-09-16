@@ -148,3 +148,22 @@ anyio.run(main)
 ```
 
 Pass a `shutdown` event to drive it from your own code instead of signals.
+
+## Command line
+
+Installing `halyard-runtime` provides a `halyard` command that inspects and
+validates an app **offline** - it builds and validates the container but never
+starts it, so no component, client or pool is touched. Point it at your App by
+import path (`module:attribute`, like uvicorn), or set `HALYARD_APP`:
+
+```
+halyard check   --app myapp.main:app     # validate config + graph (exit 1 on error) - for CI
+halyard list    --app myapp.main:app     # registered components
+halyard describe [component] --app ...   # metadata, invocables, effective chains
+halyard explain <component> <method>     # a method's chain + where each setting came from
+halyard config  <component> --app ...    # resolved config, secrets masked
+halyard schema  <component> --app ...    # JSON Schema of the config model (editor autocomplete)
+```
+
+`--json` gives machine-readable output. `halyard check` is the CI gate: it
+fails with a non-zero exit and a field-path-and-source error on bad config.
