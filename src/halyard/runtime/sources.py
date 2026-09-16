@@ -69,8 +69,6 @@ def read_file(config_models: ConfigModels, path: str | Path) -> dict[str, dict[s
         try:
             from pydantic_settings import YamlConfigSettingsSource
         except ImportError as exc:  # pragma: no cover - exercised only without the extra
-            raise ConfigurationError(
-                "YAML config requires the 'yaml' extra: pip install halyard-runtime[yaml]"
-            ) from exc
+            raise ConfigurationError("YAML config requires the 'yaml' extra: pip install halyard[yaml]") from exc
         return _read(YamlConfigSettingsSource(outer, yaml_file=file))
     raise ConfigurationError(f"unsupported config file '{file}': expected .toml, .json, .yaml or .yml")

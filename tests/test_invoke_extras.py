@@ -41,7 +41,7 @@ def container_with(*classes: type[AComponent[Any, Any, Any]], config: Any = None
 
 async def test_budget_sets_an_overall_deadline() -> None:
     # A tiny budget with a 1s backoff: the first failure cannot afford a retry.
-    config = {"flaky": {"policy": {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 1.0}}}}
+    config = {"flaky": {"policy": {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 1.0, "jitter": False}}}}
     container = container_with(Flaky, config=config)
     await container.start()
     flaky = await container.get(Flaky)
@@ -60,7 +60,7 @@ async def test_no_budget_means_no_deadline() -> None:
 
 
 async def test_proxy_budget_applies_to_every_call() -> None:
-    config = {"flaky": {"policy": {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 1.0}}}}
+    config = {"flaky": {"policy": {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 1.0, "jitter": False}}}}
     container = container_with(Flaky, config=config)
     await container.start()
     flaky = container.proxy(Flaky, budget=0.05)

@@ -1,4 +1,4 @@
-"""halyard-mcp: tool discovery, schemas, and end-to-end call routing."""
+"""halyard.mcp: tool discovery, schemas, and end-to-end call routing."""
 
 from typing import Any
 

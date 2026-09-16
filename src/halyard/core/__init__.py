@@ -8,4 +8,5 @@ import logging
 # set a level or add real handlers - that is the application's job.
 logging.getLogger("halyard").addHandler(logging.NullHandler())
 
-__version__ = version("halyard-core")
+#: Distribution version (resolved once; ``halyard`` re-exports it).
+__version__ = version("halyard")

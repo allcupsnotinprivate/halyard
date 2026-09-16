@@ -1,4 +1,4 @@
-"""Runnable demo of halyard-runtime: @component + App + env config.
+"""Runnable demo of the halyard runtime: @component + App + env config.
 
 A component registers itself with the module-level decorator; the App merges
 programmatic config with environment variables (env wins per field), starts
@@ -13,9 +13,7 @@ import os
 import anyio
 from pydantic import BaseModel
 
-from halyard.core.component import AComponent, invocable
-from halyard.core.errors import TransientError
-from halyard.runtime import App, component
+from halyard import AComponent, App, TransientError, component, invocable
 
 
 class WeatherSettings(BaseModel):

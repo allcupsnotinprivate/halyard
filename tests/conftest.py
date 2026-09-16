@@ -1,7 +1,9 @@
-"""Shared fixtures: both anyio backends, and an in-memory MCP client session."""
+"""Shared fixtures: both anyio backends, sample package, and an MCP client session."""
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from pathlib import Path
+import sys
 
 import anyio
 from mcp import ClientSession
@@ -10,6 +12,8 @@ import pytest
 
 from halyard.mcp import build_server
 from halyard.runtime import App
+
+sys.path.insert(0, str(Path(__file__).parent))  # makes `sample_app` importable
 
 
 @pytest.fixture(params=["asyncio", "trio"])

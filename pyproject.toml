@@ -1,13 +1,36 @@
-[tool.uv.workspace]
-members = ["packages/*"]
+[project]
+name = "halyard"
+version = "0.1.0"
+description = "A declarative framework for resilient, observable service components."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "allcupsnotinprivate" }]
+dependencies = [
+    "anyio>=4",
+    "pydantic>=2.7,<3",
+    "pydantic-settings>=2.5",
+    "opentelemetry-api>=1.26,<2",
+]
+
+[project.optional-dependencies]
+# Expose component invocables as Model Context Protocol tools (halyard.mcp).
+mcp = ["mcp>=2.2,<3"]
+# Load configuration from YAML files as well as TOML/JSON.
+yaml = ["pydantic-settings[yaml]>=2.5"]
+
+[project.scripts]
+halyard = "halyard.runtime.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/halyard"]
 
 [tool.uv]
 managed = true
-
-[tool.uv.sources]
-halyard-core = { workspace = true }
-halyard-runtime = { workspace = true }
-halyard-mcp = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -17,16 +40,13 @@ dev = [
     "pytest-cov>=6.2.1",
     "pre-commit>=4.5.1",
     "trio>=0.30",
-    "halyard-core",
-    "httpx>=0.28.1",
     "opentelemetry-sdk>=1.26",
-    "halyard-runtime",
     "pydantic-settings[yaml]>=2.15.0",
-    "halyard-mcp",
+    "mcp>=2.2,<3",
 ]
 
 # --------------------------------------------------------------------------
-# ruff (shared across entire workspace)
+# ruff
 # --------------------------------------------------------------------------
 
 [tool.ruff]
@@ -48,7 +68,7 @@ ignore = ["B008", "B904"]
 extend-unsafe-fixes = ["F401"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S106", "S311"]
+"tests/**" = ["S101", "S106", "S311"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["halyard"]
@@ -56,7 +76,7 @@ force-sort-within-sections = true
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 # --------------------------------------------------------------------------
-# mypy (general; specific packages are passed explicitly, see pre-commit)
+# mypy
 # --------------------------------------------------------------------------
 
 [tool.mypy]
@@ -65,17 +85,16 @@ strict = true
 plugins = ["pydantic.mypy"]
 namespace_packages = true
 explicit_package_bases = true
-# Each workspace member's src is a package base; append new members here.
-mypy_path = ["packages/halyard-core/src", "packages/halyard-runtime/src", "packages/halyard-mcp/src"]
+mypy_path = ["src"]
 exclude = ['/tests/']
 
 # --------------------------------------------------------------------------
-# pytest / coverage (run from the root; tests are located in packages/*/tests)
+# pytest / coverage
 # --------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --import-mode=importlib"
-testpaths = ["packages"]
+testpaths = ["tests"]
 markers = [
     "unit: isolated unit tests",
     "integration: integration tests against real dependencies",
@@ -85,7 +104,7 @@ filterwarnings = []
 
 [tool.coverage.run]
 branch = true
-omit = ["*/__init__.py", "*/tests/*"]
+omit = ["*/__init__.py", "tests/*"]
 
 [tool.coverage.report]
 show_missing = true

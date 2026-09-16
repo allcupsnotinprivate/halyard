@@ -14,9 +14,8 @@ from typing import Any, Protocol
 import anyio
 from pydantic import BaseModel
 
-from halyard.core.component import AComponent, invocable
-from halyard.core.errors import TransientError
-from halyard.core.testing import InstantClock, drive, drive_policy, fails_then_succeeds
+from halyard import AComponent, TransientError, invocable
+from halyard.testing import InstantClock, drive, drive_policy, fails_then_succeeds
 
 
 class Client(Protocol):

@@ -1,6 +1,6 @@
-# MCP tools (halyard-mcp)
+# MCP tools
 
-`halyard-mcp` exposes a component's invocables as [Model Context
+The `mcp` extra (`pip install halyard[mcp]`) exposes a component's invocables as [Model Context
 Protocol](https://modelcontextprotocol.io) tools. It is a projection, not a new
 component type: a tool **is** an `@invocable` method that you additionally mark
 with `@tool`. Every tool call is routed through `container.invoke`, so it runs
@@ -10,7 +10,7 @@ free. `@tool` lives in this package, so the core never learns about MCP.
 ## Marking a tool
 
 ```python
-from halyard.core.component import AComponent, invocable
+from halyard import AComponent, invocable
 from halyard.mcp import tool
 
 
@@ -50,7 +50,7 @@ Per tool, derived from the invocable's descriptor:
 - **description** - the `@tool` description, else the method docstring.
 - **inputSchema** - the method's input JSON Schema, with read-only/computed
   fields dropped (a model does not fill those in). Parameters annotated with a
-  field format (`halyard.core.formats`, e.g. `host: Ipv4`) carry the `format`
+  field format (`halyard.formats`, e.g. `host: Ipv4`) carry the `format`
   keyword, and the arguments an LLM supplies are validated against the input
   model before the call - an invalid value comes back as a tool error.
 - **outputSchema** - the return type's JSON Schema, advertised only when it is

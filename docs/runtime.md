@@ -1,4 +1,4 @@
-# Runtime (halyard-runtime)
+# Runtime
 
 The application layer over the core: one `App` object owns the registry, the
 configuration and the container lifecycle. The core stays explicit and
@@ -7,7 +7,7 @@ instance-scoped; the runtime adds the convenient defaults an application wants.
 ## Declaring components
 
 ```python
-from halyard.runtime import App, component
+from halyard import App, component
 
 
 @component  # module-level: registers into the default registry
@@ -71,7 +71,7 @@ Env values arrive as strings and are coerced by the core's validation. Env vars
 mapping to no component field are ignored. Every registered component is
 included in the container - an absent config section means "all defaults".
 
-YAML support needs the extra: `pip install halyard-runtime[yaml]`.
+YAML support needs the extra: `pip install halyard[yaml]`.
 
 All `Container.build` options (classifier, telemetry providers,
 `framework_defaults`, a `SettingsResolver`, timeouts) pass through `App(...)`.
@@ -151,7 +151,7 @@ Pass a `shutdown` event to drive it from your own code instead of signals.
 
 ## Command line
 
-Installing `halyard-runtime` provides a `halyard` command that inspects and
+Halyard provides a `halyard` command that inspects and
 validates an app **offline** - it builds and validates the container but never
 starts it, so no component, client or pool is touched. Point it at your App by
 import path (`module:attribute`, like uvicorn), or set `HALYARD_APP`:
