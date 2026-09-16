@@ -5,3 +5,4 @@
 - [Composition](composition.md) - registry, container, dependency graph, lifecycle, axes and health.
 - [Telemetry](telemetry.md) - spans, metrics, semantic conventions and the cardinality policy.
 - [Logging](logging.md) - the library logging convention, logger names, and enabling/disabling.
+- [MCP tools](mcp.md) - exposing component invocables as Model Context Protocol tools.

@@ -7,6 +7,7 @@ managed = true
 [tool.uv.sources]
 halyard-core = { workspace = true }
 halyard-runtime = { workspace = true }
+halyard-mcp = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -21,6 +22,7 @@ dev = [
     "opentelemetry-sdk>=1.26",
     "halyard-runtime",
     "pydantic-settings[yaml]>=2.15.0",
+    "halyard-mcp",
 ]
 
 # --------------------------------------------------------------------------
@@ -64,7 +66,7 @@ plugins = ["pydantic.mypy"]
 namespace_packages = true
 explicit_package_bases = true
 # Each workspace member's src is a package base; append new members here.
-mypy_path = ["packages/halyard-core/src", "packages/halyard-runtime/src"]
+mypy_path = ["packages/halyard-core/src", "packages/halyard-runtime/src", "packages/halyard-mcp/src"]
 exclude = ['/tests/']
 
 # --------------------------------------------------------------------------

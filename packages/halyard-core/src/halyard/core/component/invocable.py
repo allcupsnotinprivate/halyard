@@ -68,9 +68,11 @@ def build_input_model(owner: str, method_name: str, fn: Callable[..., Any]) -> t
     """Derive a pydantic model of the method's inputs.
 
     ``self`` and any parameter typed as :class:`InvocationContext` are dropped -
-    they are plumbing, not part of the caller-facing contract.
+    they are plumbing, not part of the caller-facing contract. ``Annotated``
+    metadata is preserved, so field formats (:mod:`halyard.core.formats`) reach
+    the model and its schema.
     """
-    hints = get_type_hints(fn)
+    hints = get_type_hints(fn, include_extras=True)
     sig = inspect.signature(fn)
     fields: dict[str, Any] = {}
     for name, param in sig.parameters.items():
@@ -86,5 +88,5 @@ def build_input_model(owner: str, method_name: str, fn: Callable[..., Any]) -> t
 
 def build_output_adapter(fn: Callable[..., Any]) -> TypeAdapter[Any]:
     """Derive a schema adapter for the method's return annotation."""
-    hints = get_type_hints(fn)
+    hints = get_type_hints(fn, include_extras=True)
     return TypeAdapter(hints.get("return", Any))
