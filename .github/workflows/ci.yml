@@ -41,8 +41,9 @@ jobs:
         run: |
           uv build --package halyard-core -o dist
           uv build --package halyard-runtime -o dist
+          uv build --package halyard-mcp -o dist
       - name: Install into clean venv and import
         run: |
           uv venv /tmp/smoke --python 3.11
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/python -c "import halyard.core, halyard.runtime; print(halyard.core.__version__)"
+          /tmp/smoke/bin/python -c "import halyard.core, halyard.runtime, halyard.mcp; print(halyard.core.__version__)"
