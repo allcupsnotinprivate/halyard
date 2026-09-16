@@ -136,11 +136,20 @@ class App:
 
     # --- lifecycle -------------------------------------------------------
 
+    def build(self) -> Container:
+        """Build and validate the container without starting it.
+
+        Merges the config, validates it against every component's model and
+        validates the dependency graph - but instantiates nothing and touches
+        no resources. Useful for offline checks (CI) and introspection.
+        """
+        return Container.build(self._registry, self.config_mapping(), axes=self._axes, **self._build_options)
+
     async def start(self) -> Container:
         """Build the container from the merged config and start it."""
         if self._container is not None:
             return self._container
-        container = Container.build(self._registry, self.config_mapping(), axes=self._axes, **self._build_options)
+        container = self.build()
         await container.start()
         self._container = container
         return container
