@@ -8,6 +8,7 @@ import pytest
 from halyard.core.component import AComponent, EmptySettings, invocable
 from halyard.core.composition import Registry
 from halyard.core.errors import FrameworkError, PermanentError, TransientError
+from halyard.core.formats import Ipv4
 from halyard.mcp import collect_tools, tool
 from halyard.runtime import App
 
@@ -193,6 +194,43 @@ async def test_permanent_error_becomes_a_tool_error(connect) -> None:
         result = await client.call_tool("boom__go", {})
     assert result.is_error is True
     assert "bad request" in result.content[0].text
+
+
+class Geo(AComponent[EmptySettings, str, dict]):
+    name = "geo"
+
+    @tool(description="Locate an IPv4 address.")
+    @invocable
+    async def locate(self, host: Ipv4) -> dict[str, str]:
+        return {"host": host}
+
+
+async def test_format_annotated_input_appears_in_the_tool_schema(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.list_tools()
+    (tool_def,) = result.tools
+    assert tool_def.input_schema["properties"]["host"]["format"] == "ipv4"
+
+
+async def test_valid_format_argument_passes(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.call_tool("geo__locate", {"host": "10.0.0.1"})
+    assert result.is_error is False
+    assert result.structured_content == {"host": "10.0.0.1"}
+
+
+async def test_invalid_format_argument_is_a_validation_error(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.call_tool("geo__locate", {"host": "not-an-ip"})
+    assert result.is_error is True
+    assert "invalid ipv4" in result.content[0].text
+
+
+async def test_missing_required_argument_is_a_validation_error(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.call_tool("geo__locate", {})
+    assert result.is_error is True
+    assert "host" in result.content[0].text.lower()
 
 
 async def test_call_runs_through_the_policy_chain(connect) -> None:

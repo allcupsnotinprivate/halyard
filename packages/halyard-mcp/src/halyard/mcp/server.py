@@ -11,11 +11,12 @@ telemetry; the result is serialized against the invocable's output schema
 (secrets masked) and returned as both structured and text content.
 """
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 import inspect
 import json
 from typing import Any
+
+from pydantic import ValidationError
 
 from halyard.core.component import InvocableSpec, describe
 from halyard.core.errors import FrameworkError
@@ -121,9 +122,16 @@ def build_server(app: App, *, name: str = "halyard", version: str = "0") -> Serv
         if binding is None:
             unknown = mt.TextContent(type="text", text=f"unknown tool '{params.name}'")
             return mt.CallToolResult(content=[unknown], is_error=True)
-        arguments: Mapping[str, Any] = params.arguments or {}
+        # Validate/coerce the LLM-supplied arguments against the invocable's
+        # input model (this is where field formats are enforced), then pass the
+        # coerced values on. The container itself does not re-validate.
         try:
-            outcome = await app.container.invoke(binding.component, binding.method, **arguments)
+            model = binding.spec.input_model.model_validate(params.arguments or {})
+        except ValidationError as exc:
+            return mt.CallToolResult(content=[mt.TextContent(type="text", text=str(exc))], is_error=True)
+        kwargs = {field: getattr(model, field) for field in type(model).model_fields}
+        try:
+            outcome = await app.container.invoke(binding.component, binding.method, **kwargs)
         except FrameworkError as exc:
             return mt.CallToolResult(content=[mt.TextContent(type="text", text=str(exc))], is_error=True)
 

@@ -49,7 +49,10 @@ Per tool, derived from the invocable's descriptor:
 - **name** - `component__method` (MCP names disallow `.`) or the `name` override.
 - **description** - the `@tool` description, else the method docstring.
 - **inputSchema** - the method's input JSON Schema, with read-only/computed
-  fields dropped (a model does not fill those in).
+  fields dropped (a model does not fill those in). Parameters annotated with a
+  field format (`halyard.core.formats`, e.g. `host: Ipv4`) carry the `format`
+  keyword, and the arguments an LLM supplies are validated against the input
+  model before the call - an invalid value comes back as a tool error.
 - **outputSchema** - the return type's JSON Schema, advertised only when it is
   an object (per the MCP spec).
 - **annotations** - the hint flags above.

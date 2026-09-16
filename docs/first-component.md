@@ -54,6 +54,22 @@ Everything else is **opt-in**, added only when you need it:
           owner = await self.profiles.get(user_id)  # typed, no strings
           ...
   ```
+- typed **field formats** - annotate a string parameter with a format so its
+  schema says what shape it is and the value is validated:
+
+  ```python
+  from halyard.core.formats import Ipv4, Uuid
+
+
+  @invocable
+  async def lookup(self, host: Ipv4, ticket: Uuid) -> Report: ...
+  ```
+
+  The input schema then carries `"format": "ipv4"` (an LLM or config author
+  sees the intent), and a bad value is rejected. Only the standard JSON Schema
+  string formats ship (date, email, uri, uuid, ipv4/6, hostname, regex, ...);
+  define your own with `Annotated[str, Format("my-format", "...", validator)]` -
+  there is no registry.
 - `criticality`, `lifetime`/`scope`, `defaults`, `version` - see
   [composition.md](composition.md).
 
