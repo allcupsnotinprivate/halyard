@@ -5,7 +5,7 @@ field's JSON Schema carries a ``format`` keyword (so an LLM or a config author
 knows what shape the string is) and, optionally, the value is validated. Only
 the standard JSON Schema string formats ship here; define your own ``Format``
 for anything domain-specific - there is no registry, so a custom format is just
-a value you put in ``Annotated``::
+a value you put in ``Annotated``:
 
     Sha256 = Annotated[str, Format("hash-sha256", "SHA-256 hex", _validate_sha256)]
 

@@ -7,6 +7,12 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    logo: material/grain
+    repo: fontawesome/brands/github
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -15,13 +21,24 @@ theme:
       scheme: slate
       toggle: { icon: material/weather-sunny, name: Switch to light mode }
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.indexes
     - navigation.top
-    - content.code.copy
-    - content.action.edit
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.footer
     - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
     - search.suggest
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
 
 plugins:
   - search

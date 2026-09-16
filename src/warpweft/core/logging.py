@@ -20,7 +20,7 @@ from .context import current_correlation_id
 class CorrelationIdFilter(logging.Filter):
     """Add ``correlation_id`` to every record (empty string when unset).
 
-    Lets a format string reference ``%(correlation_id)s``::
+    Lets a format string reference ``%(correlation_id)s``:
 
         handler.addFilter(CorrelationIdFilter())
         handler.setFormatter(logging.Formatter("%(correlation_id)s %(message)s"))

@@ -1,0 +1,74 @@
+/* ============================================================
+   Warpweft docs — "Slate-mono" theme
+   Graphite chrome, a single cyan accent, generous whitespace.
+   Tuned for readability in both light and dark schemes.
+   ============================================================ */
+
+/* ---- Light scheme (default) ------------------------------- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        #0f172a;  /* graphite header */
+  --md-primary-fg-color--light: #1e293b;
+  --md-primary-fg-color--dark:  #020617;
+  --md-primary-bg-color:        #f8fafc;  /* text on the header */
+  --md-primary-bg-color--light: #e2e8f0;
+
+  --md-accent-fg-color:         #0891b2;  /* cyan-600, hover/accent */
+  --md-typeset-a-color:         #0e7490;  /* cyan-700, links on white */
+
+  --md-code-bg-color:           #f1f5f9;
+  --md-code-fg-color:           #0f172a;
+}
+
+/* ---- Dark scheme (slate) ---------------------------------- */
+[data-md-color-scheme="slate"] {
+  --md-hue: 222;                          /* cool graphite, not blue-grey */
+  --md-default-bg-color:        #0b1120;
+  --md-primary-fg-color:        #0b1120;
+  --md-primary-bg-color:        #e2e8f0;
+
+  --md-accent-fg-color:         #22d3ee;  /* cyan-400, pops on dark */
+  --md-typeset-a-color:         #38bdf8;
+
+  --md-code-bg-color:           #111a2e;
+}
+
+/* ---- Typography: a touch more air ------------------------- */
+.md-typeset {
+  --md-typeset-line-height: 1.7;
+  letter-spacing: 0.1px;
+}
+.md-typeset h1,
+.md-typeset h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.md-typeset h2 {
+  margin-top: 2.2em;
+}
+
+/* Monospaced inline code as a subtle chip */
+.md-typeset code {
+  border-radius: 4px;
+  padding: 0.12em 0.36em;
+  font-size: 0.86em;
+}
+
+/* Calmer, wider content column */
+.md-grid {
+  max-width: 68rem;
+}
+
+/* ---- Chrome: quiet tabs, cyan active underline ------------ */
+.md-tabs {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-tabs__item--active .md-tabs__link {
+  opacity: 1;
+  border-bottom: 2px solid var(--md-accent-fg-color);
+}
+
+/* ---- API reference (mkdocstrings): clearer object breaks -- */
+.md-typeset .doc-heading {
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  padding-top: 0.8em;
+}
