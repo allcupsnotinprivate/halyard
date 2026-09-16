@@ -3,10 +3,10 @@
 The decorator records an optional policy override and nothing else at
 definition time. The input/output schemas are derived later, when the
 descriptor is built, from the method's type annotations via pydantic - the
-same schemas that become an MCP tool contract.
+same schemas that describe its inputs and outputs to callers.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import inspect
 from typing import Any, TypeVar, get_type_hints, overload
@@ -21,6 +21,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 #: Attribute the decorator stamps on the function object.
 _MARK = "__warpweft_invocable__"
+
+#: Attribute a custom `InputBinding` is stamped under.
+_INPUT_BINDING = "__warpweft_input_binding__"
 
 
 @overload
@@ -48,6 +51,37 @@ def policy_override(obj: object) -> Policy | None:
     return getattr(obj, _MARK, None)
 
 
+def _by_parameter(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Default argument binder: caller-facing fields become method kwargs 1:1."""
+    return dict(arguments)
+
+
+@dataclass(frozen=True)
+class InputBinding:
+    """A custom shape for an invocable's caller-facing input.
+
+    ``model`` is the input contract used for the schema and validation; ``bind``
+    maps the caller-facing arguments to the keyword arguments the method is
+    actually invoked with. A higher layer attaches this when an invocable's input
+    is not the usual one-field-per-parameter form; absent otherwise. Core only
+    consumes it - it never depends on why a layer chose a particular shape.
+    """
+
+    model: type[BaseModel]
+    bind: Callable[[Mapping[str, Any]], dict[str, Any]]
+
+
+def set_input_binding(fn: F, binding: InputBinding) -> F:
+    """Attach a custom `InputBinding` to an invocable method; return the method."""
+    setattr(fn, _INPUT_BINDING, binding)
+    return fn
+
+
+def input_binding_of(fn: object) -> InputBinding | None:
+    """Return the `InputBinding` attached to ``fn``, or ``None`` if it has none."""
+    return getattr(fn, _INPUT_BINDING, None)
+
+
 @dataclass(frozen=True)
 class InvocableSpec:
     """The derived contract of one invocable method."""
@@ -56,6 +90,10 @@ class InvocableSpec:
     input_model: type[BaseModel]
     output_adapter: TypeAdapter[Any]
     policy: EffectivePolicy
+    #: Maps the caller-facing arguments to the method's call kwargs. The default
+    #: passes them through unchanged; a custom binder (from an `InputBinding`)
+    #: rebuilds a richer shape, e.g. a single model parameter.
+    arg_binder: Callable[[Mapping[str, Any]], dict[str, Any]] = _by_parameter
 
     def input_json_schema(self) -> dict[str, Any]:
         return self.input_model.model_json_schema()

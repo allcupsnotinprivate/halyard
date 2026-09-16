@@ -13,7 +13,7 @@ and cached on the class; the settings model is recovered from the generic
 argument, so it is declared exactly once.
 """
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from enum import StrEnum
 import re
 from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_type_hints
@@ -21,6 +21,7 @@ from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_ty
 from pydantic import BaseModel
 
 from warpweft.core.axes import EMPTY_SCOPE, ScopeSpec
+from warpweft.core.outcome import Outcome
 from warpweft.core.unit import Identity
 
 from .health import HealthStatus
@@ -97,6 +98,10 @@ class AComponent(Generic[TSettings, TIn, TOut]):
     #: Axes a scoped component is sliced along. Must be empty for PROCESS and
     #: non-empty for SCOPED (enforced by ``describe``).
     scope: ClassVar[ScopeSpec] = EMPTY_SCOPE
+    #: Whether this component is an external entry point. Most components are;
+    #: an infrastructure-only one sets this ``False`` - it is never called from
+    #: outside and may therefore declare no invocables.
+    entrypoint: ClassVar[bool] = True
 
     def __init__(self, settings: TSettings) -> None:
         self.settings: TSettings = settings
@@ -117,6 +122,14 @@ class AComponent(Generic[TSettings, TIn, TOut]):
     def dependency(self, name: str) -> "AComponent[Any, Any, Any]":
         """Return a declared dependency's instance."""
         return self._deps[name]
+
+    def bind_invoker(self, invoke: Callable[..., Awaitable[Outcome[Any]]]) -> None:
+        """Receive a bound invoker for this instance (called by the container).
+
+        The invoker routes ``invoke(method, **kwargs)`` through this component's
+        own policy chain. The default ignores it; a subclass may override it to
+        run its own operations guarded (retry, breaker, telemetry) instead of raw.
+        """
 
     @property
     def identity(self) -> Identity:

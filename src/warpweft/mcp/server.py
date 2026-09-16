@@ -57,7 +57,13 @@ def collect_tools(app: App) -> list[ToolBinding]:
     for component in sorted(app.registry.names()):
         cls = app.registry.get(component)
         descriptor = describe(cls)
-        for method_name, member in inspect.getmembers(cls, predicate=is_tool):
+        tools = inspect.getmembers(cls, predicate=is_tool)
+        if not cls.entrypoint:
+            # A non-entry-point component (infrastructure) is never a tool.
+            if tools:
+                raise FrameworkError(f"component '{component}' is not an entry point but declares @tool methods")
+            continue
+        for method_name, member in tools:
             if method_name not in descriptor.invocables:
                 raise FrameworkError(f"'{component}.{method_name}' is marked @tool but is not @invocable")
             meta = tool_meta(member)

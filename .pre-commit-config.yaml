@@ -8,6 +8,9 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
       - id: check-yaml
+        # --unsafe: mkdocs.yml uses the `!!python/name:...` tag (mermaid fence),
+        # which the safe loader can't construct; still validates YAML syntax.
+        args: [--unsafe]
       - id: check-toml
       - id: end-of-file-fixer
       - id: trailing-whitespace

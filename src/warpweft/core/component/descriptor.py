@@ -31,6 +31,7 @@ from .invocable import (
     InvocableSpec,
     build_input_model,
     build_output_adapter,
+    input_binding_of,
     is_invocable,
     policy_override,
 )
@@ -91,14 +92,26 @@ def describe(
     invocables: dict[str, InvocableSpec] = {}
     for method_name, member in inspect.getmembers(cls, predicate=is_invocable):
         effective = resolve_policy(policy_override(member), cls.policy)
-        invocables[method_name] = InvocableSpec(
-            method_name=method_name,
-            input_model=build_input_model(owner, method_name, member),
-            output_adapter=build_output_adapter(member),
-            policy=effective,
-        )
+        binding = input_binding_of(member)
+        if binding is not None:
+            invocables[method_name] = InvocableSpec(
+                method_name=method_name,
+                input_model=binding.model,
+                output_adapter=build_output_adapter(member),
+                policy=effective,
+                arg_binder=binding.bind,
+            )
+        else:
+            invocables[method_name] = InvocableSpec(
+                method_name=method_name,
+                input_model=build_input_model(owner, method_name, member),
+                output_adapter=build_output_adapter(member),
+                policy=effective,
+            )
 
-    if not invocables:
+    # A component that is not an external entry point may be pure infrastructure,
+    # reached only through raw dependency access, so it need not declare invocables.
+    if not invocables and cls.entrypoint:
         raise ValueError(f"component '{owner}' declares no @invocable methods")
 
     if cls.lifetime is Lifetime.SCOPED and not cls.scope:

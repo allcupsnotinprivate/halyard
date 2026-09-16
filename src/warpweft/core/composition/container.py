@@ -254,10 +254,23 @@ class Container:
         self._started = True
         logger.info("container started: %d component(s), %d degraded", len(self._registrations), len(self._degraded))
 
+    def _invoker_for(self, name: str) -> Callable[..., Coroutine[Any, Any, Outcome[Any]]]:
+        """A bound invoker for one component: ``invoke(method, **kwargs)``.
+
+        Narrowly closed over ``name`` so an instance can invoke only its own
+        methods (through their policy chain) - it never gets the whole container.
+        """
+
+        async def invoke(method: str, **arguments: Any) -> Outcome[Any]:
+            return await self.invoke(name, method, **arguments)
+
+        return invoke
+
     async def _start_process(self, name: str) -> None:
         reg = self._registrations[name]
         instance, _ = self._instantiate(name, GLOBAL_SCOPE)
         instance.bind_dependencies({d: self._process[d] for d in reg.descriptor.dependencies if d in self._process})
+        instance.bind_invoker(self._invoker_for(name))
         try:
             with anyio.fail_after(self._init_timeout):
                 await instance.start()
@@ -354,6 +367,7 @@ class Container:
         def factory() -> AComponent[Any, Any, Any]:
             instance, _ = self._instantiate(component, scope_key)
             instance.bind_dependencies(deps)
+            instance.bind_invoker(self._invoker_for(component))
             return instance
 
         instance = await store.get_or_create(scope_key, factory)
@@ -411,7 +425,7 @@ class Container:
     def _build_chain(self, instance: AComponent[Any, Any, Any], name: str, method: str, config: BaseModel) -> Next:
         spec = self._registrations[name].descriptor.invocables[method]
         factories = method_factories(config, spec.policy, self._clock, self._classifier)
-        base = make_base(instance, spec.method_name)
+        base = make_base(instance, spec)
         chain = build_chain(factories, self._link_store, self._axes, base)
         return instrument(
             chain,
