@@ -1,16 +1,16 @@
-"""halyard.mcp: tool discovery, schemas, and end-to-end call routing."""
+"""warpweft.mcp: tool discovery, schemas, and end-to-end call routing."""
 
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
 import pytest
 
-from halyard.core.component import AComponent, EmptySettings, invocable
-from halyard.core.composition import Registry
-from halyard.core.errors import FrameworkError, PermanentError, TransientError
-from halyard.core.formats import Ipv4
-from halyard.mcp import collect_tools, tool
-from halyard.runtime import App
+from warpweft.core.component import AComponent, EmptySettings, invocable
+from warpweft.core.composition import Registry
+from warpweft.core.errors import FrameworkError, PermanentError, TransientError
+from warpweft.core.formats import Ipv4
+from warpweft.mcp import collect_tools, tool
+from warpweft.runtime import App
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -170,8 +170,8 @@ async def test_call_reports_outcome_metadata(connect) -> None:
     async with connect(app_with(Search)) as client:
         result = await client.call_tool("search__query", {"text": "x"})
     assert result.meta is not None
-    assert result.meta["halyard.source"] == "live"
-    assert result.meta["halyard.degraded"] is False
+    assert result.meta["warpweft.source"] == "live"
+    assert result.meta["warpweft.degraded"] is False
 
 
 async def test_unknown_tool_is_an_error(connect) -> None:

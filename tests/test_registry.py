@@ -2,9 +2,9 @@
 
 import pytest
 
-from halyard.core.component import AComponent, EmptySettings, invocable
-from halyard.core.composition.registry import Registry
-from halyard.core.errors import ConfigurationError
+from warpweft.core.component import AComponent, EmptySettings, invocable
+from warpweft.core.composition.registry import Registry
+from warpweft.core.errors import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

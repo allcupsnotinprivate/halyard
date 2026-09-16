@@ -14,18 +14,18 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode
 import pytest
 
-from halyard.core.axes import AxisRegistry
-from halyard.core.context import InvocationContext
-from halyard.core.errors import PermanentError, TransientError
-from halyard.core.observe import OBSERVER_KEY, SPAN_ATTEMPT
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.cache import CacheInterceptor, CacheSettings
-from halyard.core.pipeline.builtin.retry import RetryFactory, RetrySettings
-from halyard.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutSettings
-from halyard.core.pipeline.chain import build_chain
-from halyard.core.pipeline.state import InMemoryStateStore
-from halyard.core.telemetry import conventions as conv
-from halyard.core.telemetry.instrument import instrument
+from warpweft.core.axes import AxisRegistry
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import PermanentError, TransientError
+from warpweft.core.observe import OBSERVER_KEY, SPAN_ATTEMPT
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.cache import CacheInterceptor, CacheSettings
+from warpweft.core.pipeline.builtin.retry import RetryFactory, RetrySettings
+from warpweft.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutSettings
+from warpweft.core.pipeline.chain import build_chain
+from warpweft.core.pipeline.state import InMemoryStateStore
+from warpweft.core.telemetry import conventions as conv
+from warpweft.core.telemetry.instrument import instrument
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

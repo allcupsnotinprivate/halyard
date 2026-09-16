@@ -6,15 +6,15 @@ import anyio
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.axes import AxisRegistry
-from halyard.core.clock import ManualClock, SystemClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import AttemptTimeout, DeadlineExceeded
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutInterceptor, TimeoutSettings
-from halyard.core.pipeline.chain import build_chain
-from halyard.core.pipeline.interceptor import Next
-from halyard.core.pipeline.state import InMemoryStateStore
+from warpweft.core.axes import AxisRegistry
+from warpweft.core.clock import ManualClock, SystemClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import AttemptTimeout, DeadlineExceeded
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutInterceptor, TimeoutSettings
+from warpweft.core.pipeline.chain import build_chain
+from warpweft.core.pipeline.interceptor import Next
+from warpweft.core.pipeline.state import InMemoryStateStore
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

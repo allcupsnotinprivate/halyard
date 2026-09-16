@@ -1,10 +1,10 @@
-"""The halyard CLI: app loading, each command, JSON output, error paths."""
+"""The warpweft CLI: app loading, each command, JSON output, error paths."""
 
 import json
 
 import pytest
 
-from halyard.runtime.cli import main
+from warpweft.runtime.cli import main
 
 pytestmark = pytest.mark.unit
 
@@ -22,11 +22,11 @@ def run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
 
 def test_missing_app_argument_errors(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit):
-        main(["check"])  # no --app, no HALYARD_APP
+        main(["check"])  # no --app, no WARPWEFT_APP
 
 
 def test_app_from_env(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HALYARD_APP", APP)
+    monkeypatch.setenv("WARPWEFT_APP", APP)
     code, out, _ = run(capsys, "check")
     assert code == 0
     assert "ok" in out
@@ -48,7 +48,7 @@ def test_missing_attribute(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_attribute_is_not_an_app(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit, match="not a halyard App"):
+    with pytest.raises(SystemExit, match="not a warpweft App"):
         main(["--app", "sample_app.cli_target:not_an_app", "check"])
 
 

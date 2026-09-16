@@ -2,8 +2,8 @@
 
 import pytest
 
-from halyard.core.axes import GLOBAL_SCOPE, Axis, AxisRegistry, ScopeSpec
-from halyard.core.errors import ConfigurationError
+from warpweft.core.axes import GLOBAL_SCOPE, Axis, AxisRegistry, ScopeSpec
+from warpweft.core.errors import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

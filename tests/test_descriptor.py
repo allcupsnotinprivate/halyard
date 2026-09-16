@@ -3,8 +3,8 @@
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.axes import EMPTY_SCOPE, ScopeSpec
-from halyard.core.component import (
+from warpweft.core.axes import EMPTY_SCOPE, ScopeSpec
+from warpweft.core.component import (
     AComponent,
     Criticality,
     Descriptor,
@@ -14,8 +14,8 @@ from halyard.core.component import (
     describe,
     invocable,
 )
-from halyard.core.pipeline.builtin.retry import RetrySettings
-from halyard.core.pipeline.chain import DEFAULT_ORDER
+from warpweft.core.pipeline.builtin.retry import RetrySettings
+from warpweft.core.pipeline.chain import DEFAULT_ORDER
 
 pytestmark = pytest.mark.unit
 

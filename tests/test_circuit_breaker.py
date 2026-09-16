@@ -10,18 +10,18 @@ import anyio
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import CircuitOpen, PermanentError, TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.circuit_breaker import (
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import CircuitOpen, PermanentError, TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.circuit_breaker import (
     ENDPOINT_SCOPE,
     CircuitBreakerFactory,
     CircuitBreakerInterceptor,
     CircuitBreakerSettings,
     CircuitState,
 )
-from halyard.core.pipeline.interceptor import Next
+from warpweft.core.pipeline.interceptor import Next
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

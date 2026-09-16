@@ -2,9 +2,9 @@
 
 import pytest
 
-from halyard.core.component import Lifetime
-from halyard.core.composition.graph import DependencyGraph, GraphNode
-from halyard.core.errors import ConfigurationError
+from warpweft.core.component import Lifetime
+from warpweft.core.composition.graph import DependencyGraph, GraphNode
+from warpweft.core.errors import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

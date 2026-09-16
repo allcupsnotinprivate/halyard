@@ -8,11 +8,11 @@ import anyio
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.axes import ScopeSpec
-from halyard.core.component import AComponent, EmptySettings, Lifetime, invocable
-from halyard.core.composition import Registry
-from halyard.core.errors import ConfigurationError, DeadlineExceeded, TransientError
-from halyard.runtime import App, component, default_registry
+from warpweft.core.axes import ScopeSpec
+from warpweft.core.component import AComponent, EmptySettings, Lifetime, invocable
+from warpweft.core.composition import Registry
+from warpweft.core.errors import ConfigurationError, DeadlineExceeded, TransientError
+from warpweft.runtime import App, component, default_registry
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -219,7 +219,7 @@ async def test_lifespan_stops_even_when_the_host_body_raises() -> None:
 async def test_config_file_is_the_base_layer_under_config_and_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    cfg = tmp_path / "halyard.toml"
+    cfg = tmp_path / "warpweft.toml"
     cfg.write_text('[greeter]\ngreeting = "file-hi"\nvolume = 9\n')
     monkeypatch.setenv("FA_GREETER__VOLUME", "5")  # env overrides the file's volume
     app = App(
@@ -234,21 +234,21 @@ async def test_config_file_is_the_base_layer_under_config_and_env(
 
 
 def test_json_config_file(tmp_path: Path) -> None:
-    cfg = tmp_path / "halyard.json"
+    cfg = tmp_path / "warpweft.json"
     cfg.write_text('{"greeter": {"volume": 3}}')
     app = App(registry=_greeter_registry(), config_file=cfg)
     assert app.config_mapping()["greeter"] == {"volume": 3}
 
 
 def test_yaml_config_file(tmp_path: Path) -> None:
-    cfg = tmp_path / "halyard.yaml"
+    cfg = tmp_path / "warpweft.yaml"
     cfg.write_text("greeter:\n  greeting: yaml-hi\n  volume: 8\n")
     app = App(registry=_greeter_registry(), config_file=cfg)
     assert app.config_mapping()["greeter"] == {"greeting": "yaml-hi", "volume": 8}
 
 
 def test_unsupported_config_file_type_is_rejected(tmp_path: Path) -> None:
-    cfg = tmp_path / "halyard.ini"
+    cfg = tmp_path / "warpweft.ini"
     cfg.write_text("[greeter]\n")
     app = App(registry=_greeter_registry(), config_file=cfg)
     with pytest.raises(ConfigurationError, match="unsupported config file"):
@@ -307,7 +307,7 @@ async def test_budget_passthrough_on_invoke_and_proxy() -> None:
 
 
 async def test_correlation_helper_binds_the_ambient_id() -> None:
-    from halyard.core.context import InvocationContext
+    from warpweft.core.context import InvocationContext
 
     class TypedEcho(AComponent[EmptySettings, None, str]):
         name = "echo"

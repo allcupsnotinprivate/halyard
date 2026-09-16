@@ -3,7 +3,7 @@
 from pydantic import BaseModel, computed_field
 import pytest
 
-from halyard.mcp.schema import tool_input_schema
+from warpweft.mcp.schema import tool_input_schema
 
 pytestmark = pytest.mark.unit
 

@@ -3,8 +3,8 @@
 import anyio
 import pytest
 
-from halyard.core.axes import ScopeKey
-from halyard.core.pipeline.state import InMemoryStateStore
+from warpweft.core.axes import ScopeKey
+from warpweft.core.pipeline.state import InMemoryStateStore
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

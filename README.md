@@ -1,7 +1,7 @@
-# halyard
+# warpweft
 
 A declarative framework for building resilient, observable service components in
-async Python. You write a component's *calls*; halyard wraps every call with
+async Python. You write a component's *calls*; warpweft wraps every call with
 retry, timeout, circuit breaking, caching, concurrency limiting and telemetry -
 driven by configuration, not boilerplate.
 
@@ -11,15 +11,15 @@ trio). Typed throughout (`mypy --strict`).
 ## Install
 
 ```bash
-pip install halyard          # core + runtime
-pip install halyard[mcp]     # + expose components as Model Context Protocol tools
-pip install halyard[yaml]    # + YAML config files
+pip install warpweft          # core + runtime
+pip install warpweft[mcp]     # + expose components as Model Context Protocol tools
+pip install warpweft[yaml]    # + YAML config files
 ```
 
 ## A taste
 
 ```python
-from halyard import AComponent, App, component, invocable
+from warpweft import AComponent, App, component, invocable
 
 
 class WeatherSettings(BaseModel):
@@ -44,10 +44,10 @@ async with app.run():
     forecast = await app.proxy(Weather).forecast(city="oslo")  # runs through the chain
 ```
 
-Everything useful is importable from `halyard`; focused surfaces have their own
-module - `halyard.formats` (field formats), `halyard.testing` (test helpers),
-`halyard.mcp` (MCP tools, with the extra). The internal layers remain available
-as `halyard.core.*` and `halyard.runtime.*`.
+Everything useful is importable from `warpweft`; focused surfaces have their own
+module - `warpweft.formats` (field formats), `warpweft.testing` (test helpers),
+`warpweft.mcp` (MCP tools, with the extra). The internal layers remain available
+as `warpweft.core.*` and `warpweft.runtime.*`.
 
 ## Documentation
 

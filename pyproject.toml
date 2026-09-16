@@ -1,5 +1,5 @@
 [project]
-name = "halyard"
+name = "warpweft"
 version = "0.1.0"
 description = "A declarative framework for resilient, observable service components."
 readme = "README.md"
@@ -14,20 +14,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Expose component invocables as Model Context Protocol tools (halyard.mcp).
+# Expose component invocables as Model Context Protocol tools (warpweft.mcp).
 mcp = ["mcp>=2.2,<3"]
 # Load configuration from YAML files as well as TOML/JSON.
 yaml = ["pydantic-settings[yaml]>=2.5"]
 
 [project.scripts]
-halyard = "halyard.runtime.cli:main"
+warpweft = "warpweft.runtime.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/halyard"]
+packages = ["src/warpweft"]
 
 [tool.uv]
 managed = true
@@ -71,7 +71,7 @@ extend-unsafe-fixes = ["F401"]
 "tests/**" = ["S101", "S106", "S311"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["halyard"]
+known-first-party = ["warpweft"]
 force-sort-within-sections = true
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 

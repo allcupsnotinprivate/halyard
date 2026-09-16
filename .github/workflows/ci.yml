@@ -27,7 +27,7 @@ jobs:
       - name: Type-check
         run: uv run mypy src
       - name: Tests (coverage gate 90%)
-        run: uv run pytest --cov=halyard --cov-report=term
+        run: uv run pytest --cov=warpweft --cov-report=term
 
   wheel-smoke:
     name: wheel installs into clean venv
@@ -43,9 +43,9 @@ jobs:
         run: |
           uv venv /tmp/smoke --python 3.11
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/python -c "import halyard; from halyard import App, AComponent; print(halyard.__version__)"
-      - name: Install with the mcp extra and import halyard.mcp
+          /tmp/smoke/bin/python -c "import warpweft; from warpweft import App, AComponent; print(warpweft.__version__)"
+      - name: Install with the mcp extra and import warpweft.mcp
         run: |
           uv venv /tmp/smoke-mcp --python 3.11
-          uv pip install --python /tmp/smoke-mcp/bin/python "halyard[mcp] @ $(ls dist/*.whl)"
-          /tmp/smoke-mcp/bin/python -c "import halyard.mcp; from halyard.mcp import tool; print('mcp extra ok')"
+          uv pip install --python /tmp/smoke-mcp/bin/python "warpweft[mcp] @ $(ls dist/*.whl)"
+          /tmp/smoke-mcp/bin/python -c "import warpweft.mcp; from warpweft.mcp import tool; print('mcp extra ok')"

@@ -3,8 +3,8 @@
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.outcome import Outcome
-from halyard.core.unit import Identity, Startable, Stoppable, Unit
+from warpweft.core.outcome import Outcome
+from warpweft.core.unit import Identity, Startable, Stoppable, Unit
 
 pytestmark = pytest.mark.unit
 

@@ -8,10 +8,10 @@ from typing import Any
 import anyio
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import CircuitOpen, TransientError
-from halyard.core.observe import (
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import CircuitOpen, TransientError
+from warpweft.core.observe import (
     ATTR_ATTEMPT_NUMBER,
     ATTR_BACKOFF_DELAY,
     ATTR_BREAKER_STATE,
@@ -23,9 +23,9 @@ from halyard.core.observe import (
     AttributeValue,
     observer_of,
 )
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
-from halyard.core.pipeline.builtin.retry import RetryInterceptor, RetrySettings
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
+from warpweft.core.pipeline.builtin.retry import RetryInterceptor, RetrySettings
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

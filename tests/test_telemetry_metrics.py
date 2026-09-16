@@ -10,15 +10,15 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, Metric
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import CircuitOpen, TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
-from halyard.core.pipeline.builtin.retry import RetryInterceptor, RetrySettings
-from halyard.core.pipeline.chain import compose
-from halyard.core.telemetry import conventions as conv
-from halyard.core.telemetry.instrument import TelemetryConfig, instrument
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import CircuitOpen, TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
+from warpweft.core.pipeline.builtin.retry import RetryInterceptor, RetrySettings
+from warpweft.core.pipeline.chain import compose
+from warpweft.core.telemetry import conventions as conv
+from warpweft.core.telemetry.instrument import TelemetryConfig, instrument
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

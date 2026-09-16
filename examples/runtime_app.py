@@ -1,4 +1,4 @@
-"""Runnable demo of the halyard runtime: @component + App + env config.
+"""Runnable demo of the warpweft runtime: @component + App + env config.
 
 A component registers itself with the module-level decorator; the App merges
 programmatic config with environment variables (env wins per field), starts
@@ -13,7 +13,7 @@ import os
 import anyio
 from pydantic import BaseModel
 
-from halyard import AComponent, App, TransientError, component, invocable
+from warpweft import AComponent, App, TransientError, component, invocable
 
 
 class WeatherSettings(BaseModel):

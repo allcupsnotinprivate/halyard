@@ -4,27 +4,27 @@ import logging
 
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.component import AComponent, Criticality, EmptySettings, invocable
-from halyard.core.composition import Container, Registry
-from halyard.core.context import InvocationContext, use_correlation_id
-from halyard.core.errors import TransientError
-from halyard.core.logging import CorrelationIdFilter
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
+from warpweft.core.clock import ManualClock
+from warpweft.core.component import AComponent, Criticality, EmptySettings, invocable
+from warpweft.core.composition import Container, Registry
+from warpweft.core.context import InvocationContext, use_correlation_id
+from warpweft.core.errors import TransientError
+from warpweft.core.logging import CorrelationIdFilter
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.circuit_breaker import CircuitBreakerInterceptor, CircuitBreakerSettings
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 
 
-def test_halyard_logger_has_a_null_handler() -> None:
-    handlers = logging.getLogger("halyard").handlers
+def test_warpweft_logger_has_a_null_handler() -> None:
+    handlers = logging.getLogger("warpweft").handlers
     assert any(isinstance(h, logging.NullHandler) for h in handlers)
 
 
-def test_module_loggers_are_under_the_halyard_hierarchy() -> None:
-    from halyard.core.composition import container
+def test_module_loggers_are_under_the_warpweft_hierarchy() -> None:
+    from warpweft.core.composition import container
 
-    assert container.logger.name == "halyard.core.composition.container"
+    assert container.logger.name == "warpweft.core.composition.container"
 
 
 class Worker(AComponent[EmptySettings, None, str]):
@@ -37,7 +37,7 @@ async def test_container_logs_start_and_stop(caplog: pytest.LogCaptureFixture) -
     reg = Registry()
     reg.register(Worker)
     container = Container.build(reg, {"worker": {}})
-    with caplog.at_level(logging.INFO, logger="halyard"):
+    with caplog.at_level(logging.INFO, logger="warpweft"):
         await container.start()
         await container.stop()
     messages = [r.getMessage() for r in caplog.records]
@@ -58,7 +58,7 @@ async def test_degraded_optional_component_is_logged(caplog: pytest.LogCaptureFi
     reg = Registry()
     reg.register(Fragile)
     container = Container.build(reg, {"fragile": {}})
-    with caplog.at_level(logging.WARNING, logger="halyard"):
+    with caplog.at_level(logging.WARNING, logger="warpweft"):
         await container.start()
     assert any("degraded" in r.getMessage() and r.levelno == logging.WARNING for r in caplog.records)
     await container.stop()
@@ -75,7 +75,7 @@ async def test_breaker_open_and_close_are_logged(caplog: pytest.LogCaptureFixtur
         return Outcome(value="ok")
 
     ctx = InvocationContext(operation="op", correlation_id="cid")
-    with caplog.at_level(logging.INFO, logger="halyard"):
+    with caplog.at_level(logging.INFO, logger="warpweft"):
         with pytest.raises(TransientError):
             await breaker.call(boom, ctx)  # opens
         clock.advance(5.0)
@@ -87,7 +87,7 @@ async def test_breaker_open_and_close_are_logged(caplog: pytest.LogCaptureFixtur
 
 def test_correlation_id_filter_stamps_records() -> None:
     filt = CorrelationIdFilter()
-    record = logging.LogRecord("halyard", logging.INFO, __file__, 1, "msg", (), None)
+    record = logging.LogRecord("warpweft", logging.INFO, __file__, 1, "msg", (), None)
 
     assert filt.filter(record) is True
     assert record.correlation_id == ""  # unset -> empty

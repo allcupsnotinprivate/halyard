@@ -2,9 +2,9 @@
 
 import pytest
 
-from halyard.core.component import AComponent, EmptySettings, invocable
-from halyard.core.errors import AttemptTimeout, PermanentError, RetryExhausted, TransientError
-from halyard.core.testing import (
+from warpweft.core.component import AComponent, EmptySettings, invocable
+from warpweft.core.errors import AttemptTimeout, PermanentError, RetryExhausted, TransientError
+from warpweft.core.testing import (
     DictSettingsResolver,
     FakeSettingsResolver,
     InMemoryStateStore,

@@ -3,7 +3,7 @@
 from pydantic import BaseModel, Field
 import pytest
 
-from halyard.core.composition.config import (
+from warpweft.core.composition.config import (
     SOURCE_COMPONENT,
     SOURCE_DEPLOYMENT,
     SOURCE_FRAMEWORK,
@@ -12,7 +12,7 @@ from halyard.core.composition.config import (
     assemble_config,
     deep_merge,
 )
-from halyard.core.errors import ConfigurationError
+from warpweft.core.errors import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

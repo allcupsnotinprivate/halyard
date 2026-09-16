@@ -3,9 +3,9 @@
 import anyio
 import pytest
 
-from halyard.core.component import AComponent, Criticality, EmptySettings, Health, HealthStatus, invocable
-from halyard.core.composition import Container, Registry
-from halyard.core.composition.health import aggregate_readiness
+from warpweft.core.component import AComponent, Criticality, EmptySettings, Health, HealthStatus, invocable
+from warpweft.core.composition import Container, Registry
+from warpweft.core.composition.health import aggregate_readiness
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

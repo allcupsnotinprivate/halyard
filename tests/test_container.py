@@ -10,11 +10,11 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
-from halyard.core.component import AComponent, Criticality, EmptySettings, Lifetime, invocable
-from halyard.core.composition import Container, Registry
-from halyard.core.context import InvocationContext
-from halyard.core.errors import CircuitOpen, ComponentUnavailable, ConfigurationError, StartupError, TransientError
+from warpweft.core.axes import Axis, AxisRegistry, ScopeSpec
+from warpweft.core.component import AComponent, Criticality, EmptySettings, Lifetime, invocable
+from warpweft.core.composition import Container, Registry
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import CircuitOpen, ComponentUnavailable, ConfigurationError, StartupError, TransientError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 

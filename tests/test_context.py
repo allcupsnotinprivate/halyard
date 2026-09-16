@@ -2,8 +2,8 @@
 
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.context import (
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import (
     InvocationContext,
     current_context,
     current_correlation_id,

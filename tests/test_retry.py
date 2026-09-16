@@ -12,12 +12,12 @@ import anyio
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import DeadlineExceeded, ErrorClass, PermanentError, RetryExhausted, TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.retry import RetryFactory, RetryInterceptor, RetrySettings
-from halyard.core.pipeline.interceptor import Next
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import DeadlineExceeded, ErrorClass, PermanentError, RetryExhausted, TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.retry import RetryFactory, RetryInterceptor, RetrySettings
+from warpweft.core.pipeline.interceptor import Next
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

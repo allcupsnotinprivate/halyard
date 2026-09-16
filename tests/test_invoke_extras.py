@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from halyard.core.component import AComponent, EmptySettings, invocable
-from halyard.core.composition import Container, Registry
-from halyard.core.context import InvocationContext, use_correlation_id
-from halyard.core.errors import DeadlineExceeded, TransientError
+from warpweft.core.component import AComponent, EmptySettings, invocable
+from warpweft.core.composition import Container, Registry
+from warpweft.core.context import InvocationContext, use_correlation_id
+from warpweft.core.errors import DeadlineExceeded, TransientError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 

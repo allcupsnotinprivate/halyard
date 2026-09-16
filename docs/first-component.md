@@ -13,7 +13,7 @@ model, and mark entry points with `@invocable`. Put resource setup in `start` /
 
 ```python
 from pydantic import BaseModel
-from halyard import AComponent, invocable
+from warpweft import AComponent, invocable
 
 
 class ProfilesSettings(BaseModel):
@@ -58,7 +58,7 @@ Everything else is **opt-in**, added only when you need it:
   schema says what shape it is and the value is validated:
 
   ```python
-  from halyard.formats import Ipv4, Uuid
+  from warpweft.formats import Ipv4, Uuid
 
 
   @invocable
@@ -93,7 +93,7 @@ config = {
 ## 3. Run it
 
 ```python
-from halyard import Container, Registry
+from warpweft import Container, Registry
 
 registry = Registry()
 registry.register(Profiles)
@@ -116,7 +116,7 @@ await container.stop()
 
 **Metrics and traces** are already there: the container instruments every call.
 Configure an OpenTelemetry SDK (or pass providers to `Container.build`) and you
-get a span per call, child spans per retry, and the `halyard.*` metrics - see
+get a span per call, child spans per retry, and the `warpweft.*` metrics - see
 [telemetry.md](telemetry.md). With no SDK it is a free no-op.
 
 **Errors** map cleanly: retry repeats only transient failures; permanent ones
@@ -125,13 +125,13 @@ propagate. Raise `TransientError` / `PermanentError` from your method, or pass a
 
 ## 4. Test it - without a running system
 
-`halyard.testing.drive` runs your real component through its real chain on
+`warpweft.testing.drive` runs your real component through its real chain on
 an instant clock, so backoff never actually waits. Inject a fake client that
 misbehaves and assert the outcome:
 
 ```python
 import pytest
-from halyard.testing import drive
+from warpweft.testing import drive
 
 
 class FlakyClient:
@@ -168,7 +168,7 @@ To check a *policy* against a misbehaving service without writing a component,
 use `drive_policy` with a scenario:
 
 ```python
-from halyard.testing import drive_policy, fails_then_succeeds
+from warpweft.testing import drive_policy, fails_then_succeeds
 
 outcome = await drive_policy(
     {"retry": {"attempts": 5, "base_delay": 1.0, "max_delay": 8.0}},

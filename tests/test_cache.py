@@ -6,12 +6,12 @@ import anyio
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.axes import EMPTY_SCOPE, ScopeSpec
-from halyard.core.clock import ManualClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.cache import (
+from warpweft.core.axes import EMPTY_SCOPE, ScopeSpec
+from warpweft.core.clock import ManualClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.cache import (
     CacheFactory,
     CacheInterceptor,
     CacheSettings,

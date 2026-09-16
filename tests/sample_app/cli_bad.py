@@ -5,9 +5,9 @@ Uses its own Registry for isolation from the process-wide default one.
 
 from pydantic import BaseModel
 
-from halyard.core.component import AComponent, invocable
-from halyard.core.composition import Registry
-from halyard.runtime import App
+from warpweft.core.component import AComponent, invocable
+from warpweft.core.composition import Registry
+from warpweft.runtime import App
 
 
 class NeedsUrl(BaseModel):

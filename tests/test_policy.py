@@ -2,8 +2,8 @@
 
 import pytest
 
-from halyard.core.component.policy import DEFAULT_POLICY, Policy, resolve_policy
-from halyard.core.pipeline.chain import DEFAULT_ORDER
+from warpweft.core.component.policy import DEFAULT_POLICY, Policy, resolve_policy
+from warpweft.core.pipeline.chain import DEFAULT_ORDER
 
 pytestmark = pytest.mark.unit
 

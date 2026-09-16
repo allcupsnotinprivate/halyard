@@ -5,11 +5,11 @@ from contextvars import ContextVar
 import anyio
 import pytest
 
-from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
-from halyard.core.component import AComponent, Criticality, EmptySettings, Health, Lifetime, Policy, invocable
-from halyard.core.composition import Container, Registry
-from halyard.core.composition.endpoint import endpoint_axis
-from halyard.core.errors import ConfigurationError, RetryExhausted, TransientError
+from warpweft.core.axes import Axis, AxisRegistry, ScopeSpec
+from warpweft.core.component import AComponent, Criticality, EmptySettings, Health, Lifetime, Policy, invocable
+from warpweft.core.composition import Container, Registry
+from warpweft.core.composition.endpoint import endpoint_axis
+from warpweft.core.errors import ConfigurationError, RetryExhausted, TransientError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 

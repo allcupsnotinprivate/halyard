@@ -5,9 +5,9 @@ from typing import Any
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.axes import EMPTY_SCOPE
-from halyard.core.context import InvocationContext
-from halyard.core.errors import (
+from warpweft.core.axes import EMPTY_SCOPE
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import (
     CircuitOpen,
     DeadlineExceeded,
     ErrorClass,
@@ -15,13 +15,13 @@ from halyard.core.errors import (
     RetryExhausted,
     TransientError,
 )
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.degradation import (
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.degradation import (
     DegradationFactory,
     DegradationInterceptor,
     DegradationSettings,
 )
-from halyard.core.pipeline.interceptor import Next
+from warpweft.core.pipeline.interceptor import Next
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

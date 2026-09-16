@@ -11,15 +11,15 @@ from typing import Any
 import anyio
 import pytest
 
-from halyard.core.axes import AxisRegistry
-from halyard.core.context import InvocationContext
-from halyard.core.errors import AttemptTimeout, DeadlineExceeded, PermanentError, RetryExhausted, TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.retry import RetryFactory, RetrySettings
-from halyard.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutSettings
-from halyard.core.pipeline.chain import build_chain
-from halyard.core.pipeline.interceptor import Next
-from halyard.core.pipeline.state import InMemoryStateStore
+from warpweft.core.axes import AxisRegistry
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import AttemptTimeout, DeadlineExceeded, PermanentError, RetryExhausted, TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.retry import RetryFactory, RetrySettings
+from warpweft.core.pipeline.builtin.timeout import TimeoutFactory, TimeoutSettings
+from warpweft.core.pipeline.chain import build_chain
+from warpweft.core.pipeline.interceptor import Next
+from warpweft.core.pipeline.state import InMemoryStateStore
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 

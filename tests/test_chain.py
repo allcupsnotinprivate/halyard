@@ -4,13 +4,13 @@ from typing import Any
 
 import pytest
 
-from halyard.core.axes import Axis, AxisRegistry, ScopeKey, ScopeSpec
-from halyard.core.context import InvocationContext
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.chain import DEFAULT_ORDER, build_chain, compose
-from halyard.core.pipeline.interceptor import Interceptor, Next
-from halyard.core.pipeline.state import InMemoryStateStore
-from halyard.core.unit import Identity
+from warpweft.core.axes import Axis, AxisRegistry, ScopeKey, ScopeSpec
+from warpweft.core.context import InvocationContext
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.chain import DEFAULT_ORDER, build_chain, compose
+from warpweft.core.pipeline.interceptor import Interceptor, Next
+from warpweft.core.pipeline.state import InMemoryStateStore
+from warpweft.core.unit import Identity
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

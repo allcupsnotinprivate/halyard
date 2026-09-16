@@ -3,10 +3,10 @@
 from pydantic import BaseModel, SecretStr
 import pytest
 
-from halyard.core.component.settings import build_config_model, build_policy_model
-from halyard.core.errors import ConfigurationError
-from halyard.core.pipeline.builtin.retry import RetrySettings
-from halyard.core.pipeline.builtin.timeout import TimeoutSettings
+from warpweft.core.component.settings import build_config_model, build_policy_model
+from warpweft.core.errors import ConfigurationError
+from warpweft.core.pipeline.builtin.retry import RetrySettings
+from warpweft.core.pipeline.builtin.timeout import TimeoutSettings
 
 pytestmark = pytest.mark.unit
 

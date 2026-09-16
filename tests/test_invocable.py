@@ -5,15 +5,15 @@ from typing import Any
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.component.invocable import (
+from warpweft.core.component.invocable import (
     build_input_model,
     build_output_adapter,
     invocable,
     is_invocable,
     policy_override,
 )
-from halyard.core.component.policy import Policy
-from halyard.core.context import InvocationContext
+from warpweft.core.component.policy import Policy
+from warpweft.core.context import InvocationContext
 
 pytestmark = pytest.mark.unit
 

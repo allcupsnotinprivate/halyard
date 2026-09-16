@@ -10,8 +10,8 @@ from mcp import ClientSession
 from mcp.shared.memory import create_client_server_memory_streams
 import pytest
 
-from halyard.mcp import build_server
-from halyard.runtime import App
+from warpweft.mcp import build_server
+from warpweft.runtime import App
 
 sys.path.insert(0, str(Path(__file__).parent))  # makes `sample_app` importable
 

@@ -11,18 +11,18 @@ import anyio
 from pydantic import ValidationError
 import pytest
 
-from halyard.core.axes import ScopeKey
-from halyard.core.clock import ManualClock, SystemClock
-from halyard.core.context import InvocationContext
-from halyard.core.errors import DeadlineExceeded, TransientError
-from halyard.core.outcome import Outcome
-from halyard.core.pipeline.builtin.concurrency import (
+from warpweft.core.axes import ScopeKey
+from warpweft.core.clock import ManualClock, SystemClock
+from warpweft.core.context import InvocationContext
+from warpweft.core.errors import DeadlineExceeded, TransientError
+from warpweft.core.outcome import Outcome
+from warpweft.core.pipeline.builtin.concurrency import (
     ENDPOINT_SCOPE,
     ConcurrencyFactory,
     ConcurrencyInterceptor,
     ConcurrencySettings,
 )
-from halyard.core.pipeline.interceptor import Next
+from warpweft.core.pipeline.interceptor import Next
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

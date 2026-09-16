@@ -5,9 +5,9 @@ from typing import Annotated
 from pydantic import BaseModel, ValidationError
 import pytest
 
-from halyard.core import formats
-from halyard.core.component import AComponent, EmptySettings, describe, invocable
-from halyard.core.formats import (
+from warpweft.core import formats
+from warpweft.core.component import AComponent, EmptySettings, describe, invocable
+from warpweft.core.formats import (
     Date,
     DateTime,
     Email,

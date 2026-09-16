@@ -2,7 +2,7 @@
 
 import pytest
 
-from halyard.core.errors import (
+from warpweft.core.errors import (
     AttemptTimeout,
     ConfigurationError,
     DeadlineExceeded,

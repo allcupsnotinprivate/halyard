@@ -1,7 +1,7 @@
 """A component discovered by walking the package."""
 
-from halyard.core.component import AComponent, EmptySettings, invocable
-from halyard.runtime import component
+from warpweft.core.component import AComponent, EmptySettings, invocable
+from warpweft.runtime import component
 
 
 @component

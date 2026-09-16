@@ -13,8 +13,8 @@ from mcp import ClientSession
 from mcp.shared.memory import create_client_server_memory_streams
 from pydantic import BaseModel
 
-from halyard import AComponent, App, EmptySettings, Registry, invocable
-from halyard.mcp import build_server, tool
+from warpweft import AComponent, App, EmptySettings, Registry, invocable
+from warpweft.mcp import build_server, tool
 
 
 class Forecast(BaseModel):

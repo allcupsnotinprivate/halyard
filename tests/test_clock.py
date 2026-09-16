@@ -5,7 +5,7 @@ from datetime import UTC
 import anyio
 import pytest
 
-from halyard.core.clock import ManualClock, SystemClock
+from warpweft.core.clock import ManualClock, SystemClock
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
 

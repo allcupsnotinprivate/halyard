@@ -3,8 +3,8 @@
 from pydantic import BaseModel
 import pytest
 
-from halyard.core.axes import EMPTY_SCOPE
-from halyard.core.component import (
+from warpweft.core.axes import EMPTY_SCOPE
+from warpweft.core.component import (
     AComponent,
     Criticality,
     EmptySettings,

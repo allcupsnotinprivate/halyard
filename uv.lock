@@ -431,62 +431,6 @@ wheels = [
 ]
 
 [[package]]
-name = "halyard"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anyio" },
-    { name = "opentelemetry-api" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-]
-
-[package.optional-dependencies]
-mcp = [
-    { name = "mcp" },
-]
-yaml = [
-    { name = "pydantic-settings", extra = ["yaml"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mcp" },
-    { name = "mypy" },
-    { name = "opentelemetry-sdk" },
-    { name = "pre-commit" },
-    { name = "pydantic-settings", extra = ["yaml"] },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "trio" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anyio", specifier = ">=4" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2,<3" },
-    { name = "opentelemetry-api", specifier = ">=1.26,<2" },
-    { name = "pydantic", specifier = ">=2.7,<3" },
-    { name = "pydantic-settings", specifier = ">=2.5" },
-    { name = "pydantic-settings", extras = ["yaml"], marker = "extra == 'yaml'", specifier = ">=2.5" },
-]
-provides-extras = ["mcp", "yaml"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mcp", specifier = ">=2.2,<3" },
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "opentelemetry-sdk", specifier = ">=1.26" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.15.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
-    { name = "ruff", specifier = ">=0.14.11" },
-    { name = "trio", specifier = ">=0.30" },
-]
-
-[[package]]
 name = "httpcore2"
 version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1552,4 +1496,60 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/52/5c/ba82fdd0da13ade01453fc08277a70abc79128101319549f55f2e13f8f83/virtualenv-21.7.9.tar.gz", hash = "sha256:a7e42d81d779dec8afd7dc4be71640fb959ea861bccfa5980cb4ad9f92e30675", size = 5348882, upload-time = "2026-09-09T01:03:27.752Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/85/fc/888c80b8da917bfc48a41887eca244f995d190bd3c01175727089fcaf27e/virtualenv-21.7.9-py3-none-any.whl", hash = "sha256:ba3b0bb41063c848d84d76a9fe3fb7711aaa0f2fe78708e8f3cd9714770e4eac", size = 5324667, upload-time = "2026-09-09T01:03:26.023Z" },
+]
+
+[[package]]
+name = "warpweft"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anyio" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
+
+[package.optional-dependencies]
+mcp = [
+    { name = "mcp" },
+]
+yaml = [
+    { name = "pydantic-settings", extra = ["yaml"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mcp" },
+    { name = "mypy" },
+    { name = "opentelemetry-sdk" },
+    { name = "pre-commit" },
+    { name = "pydantic-settings", extra = ["yaml"] },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "trio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyio", specifier = ">=4" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2,<3" },
+    { name = "opentelemetry-api", specifier = ">=1.26,<2" },
+    { name = "pydantic", specifier = ">=2.7,<3" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
+    { name = "pydantic-settings", extras = ["yaml"], marker = "extra == 'yaml'", specifier = ">=2.5" },
+]
+provides-extras = ["mcp", "yaml"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mcp", specifier = ">=2.2,<3" },
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.26" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.15.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "ruff", specifier = ">=0.14.11" },
+    { name = "trio", specifier = ">=0.30" },
 ]

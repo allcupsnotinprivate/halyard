@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import pytest
 
-from halyard.core.component import (
+from warpweft.core.component import (
     AComponent,
     EmptySettings,
     component_dependencies,
@@ -12,8 +12,8 @@ from halyard.core.component import (
     describe,
     invocable,
 )
-from halyard.core.composition import Container, Registry
-from halyard.core.errors import ComponentUnavailable, ConfigurationError, TransientError
+from warpweft.core.composition import Container, Registry
+from warpweft.core.errors import ComponentUnavailable, ConfigurationError, TransientError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -102,7 +102,7 @@ async def test_get_before_start_and_unknown_are_rejected() -> None:
 
 
 async def test_get_degraded_optional_raises_unavailable() -> None:
-    from halyard.core.component import Criticality
+    from warpweft.core.component import Criticality
 
     class Fragile(AComponent[EmptySettings, None, None]):
         criticality = Criticality.OPTIONAL
@@ -155,8 +155,8 @@ async def test_proxy_routes_through_the_chain() -> None:
 async def test_get_resolves_a_scoped_instance_for_the_current_axis() -> None:
     from contextvars import ContextVar
 
-    from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
-    from halyard.core.component import Lifetime
+    from warpweft.core.axes import Axis, AxisRegistry, ScopeSpec
+    from warpweft.core.component import Lifetime
 
     tenant: ContextVar[str | None] = ContextVar("ergo_tenant", default=None)
 

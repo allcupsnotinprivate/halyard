@@ -4,11 +4,11 @@ from contextvars import ContextVar
 
 import pytest
 
-from halyard.core.axes import Axis, AxisRegistry, ScopeSpec
-from halyard.core.component import AComponent, EmptySettings, Lifetime, Policy, invocable
-from halyard.core.composition import Container, DictSettingsResolver, Registry
-from halyard.core.composition.config import SOURCE_COMPONENT, SOURCE_DEPLOYMENT, SOURCE_FRAMEWORK, SOURCE_SLICE
-from halyard.core.errors import ConfigurationError
+from warpweft.core.axes import Axis, AxisRegistry, ScopeSpec
+from warpweft.core.component import AComponent, EmptySettings, Lifetime, Policy, invocable
+from warpweft.core.composition import Container, DictSettingsResolver, Registry
+from warpweft.core.composition.config import SOURCE_COMPONENT, SOURCE_DEPLOYMENT, SOURCE_FRAMEWORK, SOURCE_SLICE
+from warpweft.core.errors import ConfigurationError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
