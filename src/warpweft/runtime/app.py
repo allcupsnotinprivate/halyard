@@ -3,10 +3,10 @@
 ``App`` owns a type registry and builds/starts/stops the core ``Container``.
 Configuration merges the programmatic mapping with environment variables
 (environment wins, field by field). Registration stays explicit - the
-``@component`` decorator - while :func:`warpweft.runtime.discovery.autodiscover`
+``@component`` decorator - while `warpweft.runtime.discovery.autodiscover`
 removes the manual import list.
 
-The module-level :func:`component` decorator registers into a process-wide
+The module-level `component` decorator registers into a process-wide
 default registry (the convenient path, like Celery's ``shared_task``). For
 full isolation - several independent apps in one process, hermetic tests -
 give each ``App`` its own ``Registry`` and use ``@app.component`` instead.
@@ -232,7 +232,7 @@ class App:
         Nothing is published into the host: reach the running system through
         this object (``app.container``, ``app.proxy(...)``, ``app.invoke(...)``).
         Hosts with startup/shutdown callback pairs instead of a lifespan can
-        call :meth:`start` and :meth:`stop` directly.
+        call `start` and `stop` directly.
         """
         return self._lifespan()
 

@@ -2,7 +2,7 @@
 
 Unlike an ordinary axis, ``endpoint`` does not read a request-scoped value: it
 reflects which external system the *current instance* talks to. The container
-sets it around each invocation from the instance's :meth:`AComponent.endpoint`,
+sets it around each invocation from the instance's `AComponent.endpoint`,
 so ``[endpoint]``-sliced link state (breaker, concurrency) is shared by all
 instances hitting the same endpoint and separated otherwise - without any
 component declaring it.
@@ -31,5 +31,5 @@ def use_endpoint(value: str) -> Iterator[None]:
 
 
 def endpoint_axis() -> Axis:
-    """The endpoint axis: resolves to the endpoint bound by :func:`use_endpoint`."""
+    """The endpoint axis: resolves to the endpoint bound by `use_endpoint`."""
     return Axis(name=ENDPOINT_AXIS, resolver=_current_endpoint.get)

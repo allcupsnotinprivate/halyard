@@ -71,7 +71,7 @@ async def drive(
     The component is used as-is (construct it with test settings and inject any
     fakes first). ``config`` is the deployment config whose ``policy`` section
     turns links on; the method's own policy still restricts the chain. Backoff
-    does not wait for real - an :class:`InstantClock` is used by default.
+    does not wait for real - an `InstantClock` is used by default.
     """
     spec = describe(type(component)).invocables[method]
     policy = dict((config or {}).get("policy", {}))
@@ -102,7 +102,7 @@ async def drive_policy(
     """Run a scripted base call through a chain built from a ``policy`` dict.
 
     All configured links are active (the full default order); use the
-    :mod:`~warpweft.core.testing.scenarios` builders for ``base`` to check how a
+    `~warpweft.core.testing.scenarios` builders for ``base`` to check how a
     policy behaves against a misbehaving service.
     """
     effective = EffectivePolicy(chain=DEFAULT_ORDER, overrides={})

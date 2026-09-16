@@ -309,7 +309,7 @@ class Container:
         """Invoke a component's method through its policy chain and telemetry.
 
         ``correlation_id`` defaults to the ambient one (see
-        :func:`use_correlation_id`), then a fresh id. ``budget`` sets an overall
+        `use_correlation_id`), then a fresh id. ``budget`` sets an overall
         deadline of ``budget`` seconds for the whole call (retries included);
         the per-attempt timeout link still bounds each attempt.
         """
@@ -457,7 +457,7 @@ class Container:
         Process components return the running instance; scoped ones resolve
         for the current axis values (created lazily). ⚠️ Calling methods on the
         raw instance **bypasses the policy chain** - no retry, breaker or
-        telemetry. Use :meth:`invoke` or :meth:`proxy` for guarded calls.
+        telemetry. Use `invoke` or `proxy` for guarded calls.
         """
         name = ref if isinstance(ref, str) else ref.name
         if not self._started:
@@ -475,10 +475,10 @@ class Container:
         """A typed facade whose invocable methods run through the full chain.
 
         Each ``@invocable`` method becomes ``await proxy.method(**kwargs)`` -
-        equivalent to :meth:`invoke` (retry, breaker, telemetry included) but
+        equivalent to `invoke` (retry, breaker, telemetry included) but
         with the component's signatures for the type checker. Methods take
         keyword arguments only and return the outcome's **value**; use
-        :meth:`invoke` when you need the full :class:`Outcome` (e.g. the
+        `invoke` when you need the full `Outcome` (e.g. the
         ``degraded`` flag). ``budget`` applies an overall deadline to every call
         made through the proxy.
         """
@@ -509,7 +509,7 @@ class Container:
 
         Uses pydantic's JSON mode, so ``SecretStr`` fields render as
         ``**********`` and enums/dates become primitives - safe to print or
-        serialize (unlike :meth:`resolved_settings`, which keeps live objects).
+        serialize (unlike `resolved_settings`, which keeps live objects).
         """
         self._registration(component)
         return self._assemble(component, scope_key).model_dump(mode="json")

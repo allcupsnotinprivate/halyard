@@ -66,7 +66,7 @@ ATTR_CACHE: Final = "warpweft.cache"
 #: Axis attributes are ``warpweft.axis.<axis name>`` = axis value.
 AXIS_ATTR_PREFIX: Final = "warpweft.axis."
 
-#: Values of :data:`ATTR_STATUS`.
+#: Values of `ATTR_STATUS`.
 STATUS_OK: Final = "ok"
 STATUS_ERROR: Final = "error"
 

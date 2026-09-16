@@ -63,7 +63,7 @@ def make_base(instance: object, method_name: str) -> Next:
 
     Arguments come from ``ctx.arguments``; if the method declares an
     ``InvocationContext`` parameter it receives the context; a raw return value
-    is wrapped in an :class:`Outcome`.
+    is wrapped in an `Outcome`.
     """
     method = getattr(instance, method_name)
     hints = get_type_hints(method)

@@ -1,4 +1,4 @@
-"""Testing helpers for component authors (re-exported from :mod:`warpweft.core.testing`).
+"""Testing helpers for component authors (re-exported from `warpweft.core.testing`).
 
 from warpweft.testing import drive, drive_policy, ManualClock, fails_then_succeeds
 """

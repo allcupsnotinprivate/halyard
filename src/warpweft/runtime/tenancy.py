@@ -1,7 +1,7 @@
 """Axis handles: a one-liner over the core axis machinery.
 
 ``App.axis`` registers a contextvar-backed axis and returns an
-:class:`AxisHandle` to bind its value per request/task::
+`AxisHandle` to bind its value per request/task::
 
     tenant = app.axis("tenant", default="public")
     with tenant.use("acme"):

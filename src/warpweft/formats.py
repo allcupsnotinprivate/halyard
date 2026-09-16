@@ -1,4 +1,4 @@
-"""Field formats for component inputs (re-exported from :mod:`warpweft.core.formats`).
+"""Field formats for component inputs (re-exported from `warpweft.core.formats`).
 
 from warpweft.formats import Format, Ipv4, Uuid
 """

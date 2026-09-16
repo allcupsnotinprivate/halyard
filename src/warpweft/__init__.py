@@ -6,8 +6,8 @@ directly::
     from warpweft import App, AComponent, invocable, component
 
 The internal layers remain importable (``warpweft.core.*``, ``warpweft.runtime.*``)
-and a few focused surfaces have their own module: :mod:`warpweft.formats` (field
-formats), :mod:`warpweft.testing` (testing helpers), and :mod:`warpweft.mcp`
+and a few focused surfaces have their own module: `warpweft.formats` (field
+formats), `warpweft.testing` (testing helpers), and `warpweft.mcp`
 (Model Context Protocol tools, available with the ``mcp`` extra).
 """
 

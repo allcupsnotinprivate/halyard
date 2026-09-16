@@ -13,8 +13,8 @@ class InstantClock:
 
     Retry backoff and any other clock-driven waiting complete with no real
     delay, so a scenario runs in microseconds no matter what delays are
-    configured. The durations slept are recorded on :attr:`slept` for
-    assertions. Use :class:`warpweft.core.clock.ManualClock` instead when a test
+    configured. The durations slept are recorded on `slept` for
+    assertions. Use `warpweft.core.clock.ManualClock` instead when a test
     needs to control the passage of time step by step.
     """
 

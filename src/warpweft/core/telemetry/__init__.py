@@ -6,6 +6,6 @@ with retries) and is meant to be applied unconditionally. Collection is the
 host application's choice: with only ``opentelemetry-api`` installed and no
 SDK configured, everything is a no-op.
 
-Import :func:`warpweft.core.telemetry.instrument.instrument` to wrap a chain;
+Import `warpweft.core.telemetry.instrument.instrument` to wrap a chain;
 ``conventions`` holds the fixed names contract.
 """

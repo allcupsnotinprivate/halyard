@@ -3,7 +3,7 @@
 Interceptors never hold references to each other; everything they need to
 agree on (deadline, attempt number, shared facts) travels in the context.
 
-.. warning::
+!!! warning
     The current-context contextvar does not survive ``run_in_executor`` or
     manually spawned threads - contextvars are copied at task creation, not
     shared. Pass the context explicitly when crossing thread boundaries.
@@ -25,7 +25,7 @@ class InvocationContext:
 
     Interceptors must not mutate the context; the only mutable part is
     ``bag``, a scratch space for exchanging facts between links. A new
-    attempt is a new object created via :meth:`child`.
+    attempt is a new object created via `child`.
     """
 
     operation: str
@@ -57,7 +57,7 @@ class InvocationContext:
 
         ``budget`` is a relative number of seconds; the stored deadline is
         ``clock.monotonic() + budget``. The clock is retained so
-        :meth:`remaining` and :meth:`expired` can be called without one.
+        `remaining` and `expired` can be called without one.
         """
         deadline = None if budget is None else clock.monotonic() + budget
         return cls(operation=operation, correlation_id=correlation_id, deadline=deadline, clock=clock, **fields)
@@ -117,7 +117,7 @@ _correlation_id: ContextVar[str | None] = ContextVar("warpweft_correlation_id", 
 
 
 def current_correlation_id() -> str | None:
-    """Return the ambient correlation id, if one is bound (see :func:`use_correlation_id`)."""
+    """Return the ambient correlation id, if one is bound (see `use_correlation_id`)."""
     return _correlation_id.get()
 
 

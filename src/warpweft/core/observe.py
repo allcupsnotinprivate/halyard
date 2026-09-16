@@ -1,8 +1,8 @@
 """Observation seam between pipeline links and telemetry.
 
-Links never import a telemetry backend. Instead, an :class:`Observer` may be
+Links never import a telemetry backend. Instead, an `Observer` may be
 installed into the context ``bag`` (the telemetry wrapper does this), and links
-emit spans and events through it via :func:`observer_of`. When no observer is
+emit spans and events through it via `observer_of`. When no observer is
 installed, everything degrades to a no-op, so links behave identically with
 telemetry absent.
 

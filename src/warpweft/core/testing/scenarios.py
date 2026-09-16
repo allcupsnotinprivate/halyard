@@ -1,7 +1,7 @@
 """Scripted base calls for exercising a policy chain.
 
 Each returns a ``Next`` - a base call the chain wraps - following a failure
-script. Feed one to :func:`warpweft.core.testing.drive_policy`, or model a fake
+script. Feed one to `warpweft.core.testing.drive_policy`, or model a fake
 dependency with it.
 """
 
@@ -57,7 +57,7 @@ def always_times_out(message: str = "scripted attempt timeout") -> Next:
 def hangs() -> Next:
     """Never return. Use with a small ``timeout`` to exercise the timeout link.
 
-    Unlike :func:`always_times_out`, this really blocks, so the enclosing
+    Unlike `always_times_out`, this really blocks, so the enclosing
     ``timeout`` link must cut it - which uses real time. Keep the configured
     ``seconds`` small.
     """

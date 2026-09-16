@@ -49,6 +49,14 @@ dev = [
     "pydantic-settings[yaml]>=2.15.0",
     "mcp>=2.2,<3",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+    # Pin below the releases that swapped their mkdocs dep for `properdocs`.
+    "mkdocs-gen-files>=0.5,<0.6",
+    "mkdocs-literate-nav>=0.6,<0.6.2",
+    "mkdocs-section-index>=0.3,<0.3.11",
+]
 
 # --------------------------------------------------------------------------
 # ruff

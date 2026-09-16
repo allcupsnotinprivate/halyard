@@ -55,7 +55,7 @@ def build_config_model(
 ) -> type[BaseModel]:
     """Assemble the full config model: the component's own fields + ``policy``.
 
-    Raises :class:`ConfigurationError` if a component's own field would collide
+    Raises `ConfigurationError` if a component's own field would collide
     with the reserved ``policy`` name.
     """
     if own_settings is not None and POLICY_FIELD in own_settings.model_fields:

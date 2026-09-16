@@ -67,9 +67,9 @@ class InvocableSpec:
 def build_input_model(owner: str, method_name: str, fn: Callable[..., Any]) -> type[BaseModel]:
     """Derive a pydantic model of the method's inputs.
 
-    ``self`` and any parameter typed as :class:`InvocationContext` are dropped -
+    ``self`` and any parameter typed as `InvocationContext` are dropped -
     they are plumbing, not part of the caller-facing contract. ``Annotated``
-    metadata is preserved, so field formats (:mod:`warpweft.core.formats`) reach
+    metadata is preserved, so field formats (`warpweft.core.formats`) reach
     the model and its schema.
     """
     hints = get_type_hints(fn, include_extras=True)

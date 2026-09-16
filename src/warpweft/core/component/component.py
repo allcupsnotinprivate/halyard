@@ -7,7 +7,7 @@ is precisely typed rather than ``BaseModel | None``. The lifecycle hooks
 default to no-ops so a trivial component writes none of them.
 
 A component declares its remaining metadata as class attributes and marks its
-entry points with :func:`invocable`. The derived contract (identity, config
+entry points with `invocable`. The derived contract (identity, config
 model, per-method schemas and effective policies) is produced by ``describe``
 and cached on the class; the settings model is recovered from the generic
 argument, so it is declared exactly once.
@@ -43,7 +43,7 @@ class Lifetime(StrEnum):
     """How many instances of a component the container keeps.
 
     ``PROCESS`` - a single instance for the whole process, created at startup.
-    ``SCOPED`` - one instance per axis key (see :attr:`AComponent.scope`),
+    ``SCOPED`` - one instance per axis key (see `AComponent.scope`),
     created lazily on first use and evicted by LRU.
     """
 
@@ -58,15 +58,15 @@ class EmptySettings(BaseModel):
 class AComponent(Generic[TSettings, TIn, TOut]):
     """Base class for components.
 
-    Parameterised as ``AComponent[Settings, In, Out]``. The :attr:`name`
+    Parameterised as ``AComponent[Settings, In, Out]``. The `name`
     defaults to the snake_cased class name; set the class attribute to
-    override. Other optional class attributes: :attr:`version`, :attr:`policy`
-    (component-wide default), :attr:`dependencies` and :attr:`criticality`. The
+    override. Other optional class attributes: `version`, `policy`
+    (component-wide default), `dependencies` and `criticality`. The
     settings model comes from the ``Settings`` type argument - use
-    :class:`EmptySettings` for a component that needs none.
+    `EmptySettings` for a component that needs none.
 
-    Dependencies can be declared two ways: the :attr:`dependencies` name tuple
-    (accessed via :meth:`dependency`), or a class-level annotation whose type
+    Dependencies can be declared two ways: the `dependencies` name tuple
+    (accessed via `dependency`), or a class-level annotation whose type
     is another component - the container then assigns the resolved instance to
     that attribute, fully typed::
 

@@ -1,6 +1,6 @@
 """Health reporting for components.
 
-A component answers ``health()`` with a :class:`HealthStatus`. The three
+A component answers ``health()`` with a `HealthStatus`. The three
 states are enough for aggregation: a healthy component, one that is up but
 degraded (serving stubs / partial data), and one that is down. Readiness vs
 liveness aggregation over the dependency graph is built on top of this later.

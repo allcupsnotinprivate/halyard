@@ -1,8 +1,8 @@
 """Build an MCP server from an app's ``@tool`` invocables.
 
 Discovery, the ``list_tools`` / ``call_tool`` handlers and the transport
-adapters live here. Tool logic is transport-agnostic: :func:`build_server`
-returns a wired server; :func:`run_stdio` drives it over stdio (a local
+adapters live here. Tool logic is transport-agnostic: `build_server`
+returns a wired server; `run_stdio` drives it over stdio (a local
 subprocess host such as Claude Desktop or an IDE).
 
 Each tool is one ``@tool``-marked invocable. A call is routed through

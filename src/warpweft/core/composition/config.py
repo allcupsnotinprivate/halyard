@@ -6,7 +6,7 @@ previous **field by field** (never replacing a whole object):
 1. framework defaults,
 2. the component author's defaults,
 3. the deployment config,
-4. the per-slice override (from a :class:`SettingsResolver`).
+4. the per-slice override (from a `SettingsResolver`).
 
 Merging records where every leaf value came from (its *provenance*), which
 powers both good error messages (naming the offending field, component and
@@ -87,7 +87,7 @@ def assemble_config(
 ) -> tuple[BaseModel, Provenance]:
     """Merge the layers and validate against ``config_model``.
 
-    On a validation error, raises a :class:`ConfigurationError` naming the
+    On a validation error, raises a `ConfigurationError` naming the
     component, the full field path, and the source the value came from - so
     debugging a config never means guessing.
     """

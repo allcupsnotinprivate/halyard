@@ -1,6 +1,6 @@
 """Reusable string formats for component inputs (and their JSON schemas).
 
-A :class:`Format` is ``Annotated`` metadata: drop it on a ``str`` field and the
+A `Format` is ``Annotated`` metadata: drop it on a ``str`` field and the
 field's JSON Schema carries a ``format`` keyword (so an LLM or a config author
 knows what shape the string is) and, optionally, the value is validated. Only
 the standard JSON Schema string formats ship here; define your own ``Format``

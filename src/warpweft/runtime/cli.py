@@ -1,6 +1,6 @@
 """The ``warpweft`` command line: inspect and validate an app without running it.
 
-Every command loads an :class:`~warpweft.runtime.app.App` by import path
+Every command loads an `~warpweft.runtime.app.App` by import path
 (``module:attribute``, like uvicorn) and reads it offline - the container is
 built and validated but never started, so no component, client or pool is
 touched. That makes ``warpweft check`` safe in CI and the inspection commands
