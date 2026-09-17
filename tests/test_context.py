@@ -7,8 +7,10 @@ from warpweft.core.context import (
     InvocationContext,
     current_context,
     current_correlation_id,
+    report_progress,
     use_context,
     use_correlation_id,
+    use_progress_sink,
 )
 
 pytestmark = pytest.mark.unit
@@ -148,3 +150,22 @@ def test_correlation_id_contextvar() -> None:
             assert current_correlation_id() == "req-2"
         assert current_correlation_id() == "req-1"
     assert current_correlation_id() is None
+
+
+@pytest.mark.anyio
+async def test_report_progress_is_a_noop_without_a_sink() -> None:
+    await report_progress(0.5, total=1.0, message="halfway")  # must not raise
+
+
+@pytest.mark.anyio
+async def test_report_progress_reaches_the_installed_sink() -> None:
+    seen: list[tuple[float, float | None, str | None]] = []
+
+    async def sink(progress: float, total: float | None, message: str | None) -> None:
+        seen.append((progress, total, message))
+
+    with use_progress_sink(sink):
+        await report_progress(0.25)
+        await report_progress(0.5, total=1.0, message="halfway")
+    await report_progress(1.0)  # the sink is uninstalled again
+    assert seen == [(0.25, None, None), (0.5, 1.0, "halfway")]

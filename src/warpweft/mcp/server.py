@@ -12,6 +12,7 @@ telemetry; the result is serialized against the invocable's output schema
 """
 
 from collections.abc import Collection
+import contextlib
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 import inspect
@@ -24,6 +25,7 @@ import mcp.types as mt
 from pydantic import ValidationError
 
 from warpweft.core.component import InvocableSpec, describe
+from warpweft.core.context import use_progress_sink
 from warpweft.core.errors import FrameworkError
 from warpweft.runtime import App
 
@@ -210,11 +212,20 @@ def build_server(
         except ValidationError as exc:
             return error_result(exc)
         kwargs = {field: getattr(model, field) for field in type(model).model_fields}
+
+        async def forward_progress(progress: float, total: float | None, message: str | None) -> None:
+            # Best-effort: a failed notification must never fail the call.
+            # The session no-ops by itself when the client sent no token.
+            with contextlib.suppress(Exception):
+                await ctx.session.report_progress(progress, total, message)
+
         # Any failure - framework or user code - becomes a tool error with retry
         # guidance, never a transport-level failure. Cancellation (a
-        # BaseException) still propagates.
+        # BaseException) still propagates: the SDK cancels this handler's anyio
+        # scope on notifications/cancelled, which unwinds the policy chain.
         try:
-            outcome = await app.container.invoke(binding.component, binding.method, **kwargs)
+            with use_progress_sink(forward_progress):
+                outcome = await app.container.invoke(binding.component, binding.method, **kwargs)
         except Exception as exc:
             return error_result(exc)
 

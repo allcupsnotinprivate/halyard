@@ -2,11 +2,13 @@
 
 from typing import Any
 
+import anyio
 from pydantic import BaseModel, SecretStr
 import pytest
 
 from warpweft.core.component import AComponent, EmptySettings, invocable
 from warpweft.core.composition import Registry
+from warpweft.core.context import report_progress
 from warpweft.core.errors import (
     CircuitOpen,
     ComponentUnavailable,
@@ -400,3 +402,75 @@ async def test_validation_error_meta_marks_invalid_arguments(connect) -> None:
         result = await client.call_tool("geo__locate", {"host": "not-an-ip"})
     assert result.meta["warpweft.error"] == "invalid_arguments"
     assert result.meta["warpweft.retryable"] is True
+
+
+# --- progress & cancellation ---------------------------------------------------
+
+
+async def test_progress_reports_reach_the_client(connect) -> None:
+    class Cruncher(AComponent[EmptySettings, None, str]):
+        name = "cruncher"
+
+        @tool
+        @invocable
+        async def crunch(self) -> str:
+            await report_progress(0.5, total=1.0, message="halfway")
+            await report_progress(1.0, total=1.0, message="done")
+            return "ok"
+
+    seen: list[tuple[float, float | None, str | None]] = []
+
+    async def on_progress(progress: float, total: float | None, message: str | None) -> None:
+        seen.append((progress, total, message))
+
+    async with connect(app_with(Cruncher)) as client:
+        result = await client.call_tool("cruncher__crunch", {}, progress_callback=on_progress)
+    assert result.is_error is False
+    assert seen == [(0.5, 1.0, "halfway"), (1.0, 1.0, "done")]
+
+
+async def test_progress_without_a_client_token_is_dropped(connect) -> None:
+    class Quiet(AComponent[EmptySettings, None, str]):
+        name = "quiet"
+
+        @tool
+        @invocable
+        async def crunch(self) -> str:
+            await report_progress(0.5)  # no token -> the session no-ops
+            return "ok"
+
+    async with connect(app_with(Quiet)) as client:
+        result = await client.call_tool("quiet__crunch", {})
+    assert result.is_error is False
+
+
+async def test_client_cancellation_reaches_the_invocable(connect) -> None:
+    started = anyio.Event()
+    cancelled = anyio.Event()
+
+    class Slow(AComponent[EmptySettings, None, str]):
+        name = "slow"
+
+        @tool
+        @invocable
+        async def wait(self) -> str:
+            started.set()
+            try:
+                await anyio.sleep(60)
+            except anyio.get_cancelled_exc_class():
+                cancelled.set()
+                raise
+            return "never"
+
+    async with connect(app_with(Slow)) as client:
+        async with anyio.create_task_group() as tg:
+
+            async def call() -> None:
+                await client.call_tool("slow__wait", {})
+
+            tg.start_soon(call)
+            await started.wait()
+            tg.cancel_scope.cancel()  # abandoning the request sends notifications/cancelled
+
+        with anyio.fail_after(2):
+            await cancelled.wait()  # the SDK interrupted the handler's scope

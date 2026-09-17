@@ -107,3 +107,33 @@ The codes mirror the [error taxonomy](composition.md): transient failures
 (timeouts, an open breaker, a degraded component) are retryable, permanent
 ones are not, and an unclassified exception is reported as non-retryable
 `error` - the same stance the retry link takes.
+
+## Progress and cancellation
+
+A long-running invocable reports progress without knowing what transport
+drives it:
+
+```python
+from warpweft import report_progress
+
+
+class Indexer(AComponent[IndexerSettings, str, Report]):
+    @tool(description="Rebuild the search index.")
+    @invocable
+    async def rebuild(self) -> Report:
+        for step, shard in enumerate(self._shards, start=1):
+            await self._index(shard)
+            await report_progress(step, total=len(self._shards), message=shard)
+        ...
+```
+
+`report_progress` is a no-op unless the transport installed a sink
+(`warpweft.core.context.use_progress_sink`). The MCP server installs one per
+call, so reports become `notifications/progress` exactly when the client sent
+a `progressToken`. Reports are fire-and-forget - a failed notification never
+fails the call.
+
+Cancellation needs no code at all: when the client cancels an MCP request,
+the SDK cancels the handler's anyio scope, the cancellation unwinds the
+policy chain, and the component's cleanup (`finally` blocks, context
+managers) runs as usual.
