@@ -25,8 +25,9 @@ class Weather(AComponent[WeatherSettings, str, Forecast]):
 
 Exposure is opt-in: only `@tool`-marked invocables become tools, so health
 checks and internal helpers stay private. `@tool` accepts a `name`/`title`
-override, a `description` (else the method docstring is used), and the MCP
-annotation hints `read_only`, `destructive`, `idempotent`, `open_world`. A
+override, a `description` (else the method docstring is used), the MCP
+annotation hints `read_only`, `destructive`, `idempotent`, `open_world`, and
+free-form `tags` used to [filter](#filtering) which tools a server exposes. A
 `@tool` on a method that is not `@invocable` is rejected when the server is
 built.
 
@@ -45,6 +46,25 @@ anyio.run(run_stdio, app)  # local host (Claude Desktop, an IDE)
 `run_stdio` starts the app, serves its tools over stdio, and stops the app when
 the stream closes. For programmatic use (or a future HTTP transport),
 `build_server(app)` returns a transport-agnostic MCP server.
+
+## Filtering
+
+One app can back several servers with different tool sets - a read-only server
+for an assistant, the full set for an operator console. `collect_tools`,
+`build_server` and `run_stdio` take three narrowing arguments, applied in
+order:
+
+```python
+build_server(app, tags={"public"})  # any-match on @tool tags
+build_server(app, include={"search__*"})  # only these names (fnmatch globs)
+build_server(app, exclude={"billing__refund"})  # drop these names; wins over include
+```
+
+A tool with no tags never passes a `tags` filter, so tagging works as a
+whitelist: a forgotten tag keeps a tool private rather than exposing it. The
+filter is validated strictly - a tag no tool declares, a pattern that matches
+no tool, or a filter that leaves nothing to expose raises a `FrameworkError`
+instead of quietly serving the wrong set.
 
 ## The tool contract
 

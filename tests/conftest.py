@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from pathlib import Path
 import sys
+from typing import Any
 
 import anyio
 from mcp import ClientSession
@@ -22,16 +23,19 @@ def anyio_backend(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
-def connect() -> Callable[[App], AbstractAsyncContextManager[ClientSession]]:
+def connect() -> Callable[..., AbstractAsyncContextManager[ClientSession]]:
     """Return the ``connected(app)`` context manager for a test to use."""
     return connected
 
 
 @asynccontextmanager
-async def connected(app: App) -> AsyncIterator[ClientSession]:
-    """Start the app, run its MCP server, yield a connected client session."""
+async def connected(app: App, **server_kwargs: Any) -> AsyncIterator[ClientSession]:
+    """Start the app, run its MCP server, yield a connected client session.
+
+    Keyword arguments are passed through to ``build_server`` (e.g. ``tags``).
+    """
     async with app.run(), create_client_server_memory_streams() as (client_streams, server_streams):
-        server = build_server(app)
+        server = build_server(app, **server_kwargs)
         server_read, server_write = server_streams
         client_read, client_write = client_streams
 

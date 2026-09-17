@@ -1,8 +1,10 @@
 """Runnable demo: expose a component's @tool invocables over MCP.
 
-A component marks one method with @tool; the app serves it as an MCP tool. To
-keep the example self-contained it drives an in-memory MCP client against the
-server (a real host would connect over stdio via ``run_stdio(app)``).
+A component marks methods with @tool; the app serves them as MCP tools. Tools
+carry tags, and the server is built with ``tags={"public"}`` - so the admin
+tool stays private to this server. To keep the example self-contained it
+drives an in-memory MCP client against the server (a real host would connect
+over stdio via ``run_stdio(app)``).
 
 Run:
     uv run python examples/mcp_tools.py
@@ -26,10 +28,15 @@ class Forecast(BaseModel):
 class Weather(AComponent[EmptySettings, str, Forecast]):
     name = "weather"
 
-    @tool(description="Get today's forecast for a city.", read_only=True)
+    @tool(description="Get today's forecast for a city.", read_only=True, tags={"public"})
     @invocable
     async def forecast(self, city: str) -> Forecast:
         return Forecast(city=city, summary="sunny", high_c=21)
+
+    @tool(description="Drop the forecast cache.", destructive=True, tags={"admin"})
+    @invocable
+    async def purge(self) -> Forecast:
+        return Forecast(city="*", summary="cache dropped", high_c=0)
 
     @invocable
     async def _refresh(self) -> None:  # not a @tool -> never exposed
@@ -42,7 +49,7 @@ async def main() -> None:
     app = App(registry=registry)
 
     async with app.run(), create_client_server_memory_streams() as (client_streams, server_streams):
-        server = build_server(app)
+        server = build_server(app, tags={"public"})  # weather__purge (admin) is not served
         async with anyio.create_task_group() as tg:
             tg.start_soon(
                 lambda: server.run(*server_streams, server.create_initialization_options(), raise_exceptions=True)

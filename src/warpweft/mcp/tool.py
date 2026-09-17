@@ -10,7 +10,7 @@ everything else (health checks, internal helpers) stays private by default.
         async def forecast(self, city: str) -> Forecast: ...
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import Any, TypeVar, overload
 
@@ -26,7 +26,9 @@ class ToolMeta:
 
     ``name`` overrides the derived tool name; ``description`` overrides the
     method docstring. The hint flags map to the MCP tool annotations that help
-    a model reason about a call's effects.
+    a model reason about a call's effects. ``tags`` are free-form labels used
+    to select which tools a server exposes (see ``collect_tools``); they are
+    never sent to the client.
     """
 
     name: str | None = None
@@ -36,6 +38,7 @@ class ToolMeta:
     destructive: bool | None = None
     idempotent: bool | None = None
     open_world: bool | None = None
+    tags: frozenset[str] = frozenset()
 
 
 @overload
@@ -50,6 +53,7 @@ def tool(
     destructive: bool | None = ...,
     idempotent: bool | None = ...,
     open_world: bool | None = ...,
+    tags: Collection[str] | None = ...,
 ) -> Callable[[F], F]: ...
 def tool(
     fn: F | None = None,
@@ -61,6 +65,7 @@ def tool(
     destructive: bool | None = None,
     idempotent: bool | None = None,
     open_world: bool | None = None,
+    tags: Collection[str] | None = None,
 ) -> F | Callable[[F], F]:
     """Mark an invocable method as an MCP tool. Usable bare or with arguments."""
     meta = ToolMeta(
@@ -71,6 +76,7 @@ def tool(
         destructive=destructive,
         idempotent=idempotent,
         open_world=open_world,
+        tags=frozenset(tags or ()),
     )
 
     def stamp(func: F) -> F:

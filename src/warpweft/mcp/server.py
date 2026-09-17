@@ -11,7 +11,9 @@ telemetry; the result is serialized against the invocable's output schema
 (secrets masked) and returned as both structured and text content.
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 import inspect
 import json
 from typing import Any
@@ -45,12 +47,69 @@ def _tool_name(component: str, method: str, meta: ToolMeta) -> str:
     return meta.name or f"{component}__{method}"
 
 
-def collect_tools(app: App) -> list[ToolBinding]:
+def _filter_bindings(
+    bindings: list[ToolBinding],
+    *,
+    tags: Collection[str] | None,
+    include: Collection[str] | None,
+    exclude: Collection[str] | None,
+) -> list[ToolBinding]:
+    """Narrow the tool set: ``tags`` (any match) -> ``include`` -> ``exclude``.
+
+    Validation is strict so a typo cannot silently expose the wrong set: every
+    requested tag must be declared by some tool, every include/exclude pattern
+    must match some tool name (both checked against the *unfiltered* set), and
+    the surviving set must not be empty.
+    """
+    if tags is None and include is None and exclude is None:
+        return bindings
+    all_names = sorted(b.name for b in bindings)
+    all_tags = {t for b in bindings for t in b.meta.tags}
+    if tags is not None:
+        unknown = sorted(set(tags) - all_tags)
+        if unknown:
+            raise FrameworkError(f"no tool declares tag(s) {unknown}; declared tags: {sorted(all_tags)}")
+    for label, patterns in (("include", include), ("exclude", exclude)):
+        for pattern in sorted(patterns or ()):
+            if not any(fnmatchcase(name, pattern) for name in all_names):
+                raise FrameworkError(f"{label} pattern '{pattern}' matches no tool; tools: {all_names}")
+    selected = bindings
+    if tags is not None:
+        wanted = frozenset(tags)
+        selected = [b for b in selected if wanted & b.meta.tags]
+    if include is not None:
+        selected = [b for b in selected if any(fnmatchcase(b.name, p) for p in include)]
+    if exclude is not None:
+        selected = [b for b in selected if not any(fnmatchcase(b.name, p) for p in exclude)]
+    if not selected:
+        raise FrameworkError("tool filter leaves no tools to expose")
+    return selected
+
+
+def collect_tools(
+    app: App,
+    *,
+    tags: Collection[str] | None = None,
+    include: Collection[str] | None = None,
+    exclude: Collection[str] | None = None,
+) -> list[ToolBinding]:
     """Find every ``@tool`` invocable across the app's registered components.
 
     Raises if a method is marked ``@tool`` but is not an ``@invocable`` (a
     tool must be a pipeline entry point), or if two tools resolve to the same
     MCP name.
+
+    The keyword arguments narrow the set, applied in order:
+
+    - ``tags`` - keep tools carrying at least one of these tags. A tool with
+      no tags never passes a tag filter, so tagging works as a whitelist.
+    - ``include`` - keep only these MCP tool names (``fnmatch`` globs allowed,
+      e.g. ``"search__*"``).
+    - ``exclude`` - drop these names (globs allowed); wins over ``include``.
+
+    A tag no tool declares, a pattern matching no tool, or a filter leaving
+    nothing to expose is a `FrameworkError` - a typo should fail loudly, not
+    quietly serve the wrong tools.
     """
     bindings: list[ToolBinding] = []
     seen: dict[str, str] = {}
@@ -80,7 +139,7 @@ def collect_tools(app: App) -> list[ToolBinding]:
                     spec=descriptor.invocables[method_name],
                 )
             )
-    return bindings
+    return _filter_bindings(bindings, tags=tags, include=include, exclude=exclude)
 
 
 def _annotations(meta: ToolMeta) -> mt.ToolAnnotations | None:
@@ -114,9 +173,23 @@ def _serialize(binding: ToolBinding, value: Any) -> Any:
     return binding.spec.output_adapter.dump_python(value, mode="json")
 
 
-def build_server(app: App, *, name: str = "warpweft", version: str = "0") -> Server[Any]:
-    """Wire an MCP server exposing the app's tools. The app must be started."""
-    bindings = {b.name: b for b in collect_tools(app)}
+def build_server(
+    app: App,
+    *,
+    name: str = "warpweft",
+    version: str = "0",
+    tags: Collection[str] | None = None,
+    include: Collection[str] | None = None,
+    exclude: Collection[str] | None = None,
+) -> Server[Any]:
+    """Wire an MCP server exposing the app's tools. The app must be started.
+
+    ``tags``/``include``/``exclude`` narrow which tools are served (see
+    `collect_tools`), so one app can back several servers with different
+    tool sets - e.g. ``tags={"public"}`` for an assistant, no filter for an
+    operator console.
+    """
+    bindings = {b.name: b for b in collect_tools(app, tags=tags, include=include, exclude=exclude)}
     classes = {name: app.registry.get(name) for name in app.registry.names()}
 
     async def on_list_tools(ctx: Any, params: Any) -> mt.ListToolsResult:
@@ -153,10 +226,16 @@ def build_server(app: App, *, name: str = "warpweft", version: str = "0") -> Ser
 
 
 async def run_stdio(
-    app: App, *, name: str = "warpweft", version: str = "0"
+    app: App,
+    *,
+    name: str = "warpweft",
+    version: str = "0",
+    tags: Collection[str] | None = None,
+    include: Collection[str] | None = None,
+    exclude: Collection[str] | None = None,
 ) -> None:  # pragma: no cover - needs real stdio
     """Start the app and serve its tools over stdio until the stream closes."""
     async with app.run():
-        server = build_server(app, name=name, version=version)
+        server = build_server(app, name=name, version=version, tags=tags, include=include, exclude=exclude)
         async with stdio_server() as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())

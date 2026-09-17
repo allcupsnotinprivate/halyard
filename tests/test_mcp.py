@@ -257,3 +257,78 @@ async def test_call_runs_through_the_policy_chain(connect) -> None:
         result = await client.call_tool("flaky__fetch", {})
     assert result.is_error is False
     assert calls["n"] == 3  # retry ran under the tool call
+
+
+# --- filtering ----------------------------------------------------------------
+
+
+class Billing(AComponent[EmptySettings, str, dict]):
+    name = "billing"
+
+    @tool(description="Show an invoice.", read_only=True, tags={"public"})
+    @invocable
+    async def invoice(self, invoice_id: str) -> dict[str, str]:
+        return {"invoice": invoice_id}
+
+    @tool(description="List payments.", read_only=True, tags={"public", "admin"})
+    @invocable
+    async def payments(self) -> dict[str, str]:
+        return {"payments": "[]"}
+
+    @tool(description="Refund a payment.", destructive=True, tags={"admin"})
+    @invocable
+    async def refund(self, payment_id: str) -> dict[str, str]:
+        return {"refunded": payment_id}
+
+
+def _names(bindings: list[Any]) -> list[str]:
+    return [b.name for b in bindings]
+
+
+def test_no_filter_keeps_every_tool() -> None:
+    bindings = collect_tools(app_with(Billing, Search))
+    assert _names(bindings) == ["billing__invoice", "billing__payments", "billing__refund", "search__query"]
+
+
+def test_tags_filter_keeps_tools_with_any_requested_tag() -> None:
+    bindings = collect_tools(app_with(Billing), tags={"public"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments"]
+
+
+def test_untagged_tool_never_passes_a_tag_filter() -> None:
+    # Search.query declares no tags, so a tag filter works as a whitelist.
+    bindings = collect_tools(app_with(Billing, Search), tags={"public", "admin"})
+    assert "search__query" not in _names(bindings)
+
+
+def test_include_supports_globs() -> None:
+    bindings = collect_tools(app_with(Billing, Search), include={"billing__*"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments", "billing__refund"]
+
+
+def test_exclude_wins_over_include() -> None:
+    bindings = collect_tools(app_with(Billing), include={"billing__*"}, exclude={"billing__refund"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments"]
+
+
+def test_unknown_tag_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="no tool declares tag"):
+        collect_tools(app_with(Billing), tags={"ops"})
+
+
+def test_pattern_matching_no_tool_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="include pattern .* matches no tool"):
+        collect_tools(app_with(Billing), include={"billng__*"})
+    with pytest.raises(FrameworkError, match="exclude pattern .* matches no tool"):
+        collect_tools(app_with(Billing), exclude={"billing__ghost"})
+
+
+def test_filter_leaving_no_tools_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="leaves no tools"):
+        collect_tools(app_with(Billing), tags={"admin"}, exclude={"billing__payments", "billing__refund"})
+
+
+async def test_served_tool_set_respects_the_tag_filter(connect) -> None:
+    async with connect(app_with(Billing, Search), tags={"public"}) as client:
+        result = await client.list_tools()
+    assert [t.name for t in result.tools] == ["billing__invoice", "billing__payments"]
