@@ -3,6 +3,7 @@
 from typing import Any
 
 import anyio
+import mcp.types as mt
 from pydantic import BaseModel, SecretStr
 import pytest
 
@@ -474,3 +475,72 @@ async def test_client_cancellation_reaches_the_invocable(connect) -> None:
 
         with anyio.fail_after(2):
             await cancelled.wait()  # the SDK interrupted the handler's scope
+
+
+# --- destructive confirmation ---------------------------------------------------
+
+
+def purge_component() -> tuple[type[AComponent[Any, Any, Any]], dict[str, int]]:
+    ran = {"n": 0}
+
+    class Purge(AComponent[EmptySettings, None, str]):
+        name = "purge"
+
+        @tool(description="Drop everything.", destructive=True)
+        @invocable
+        async def run(self) -> str:
+            ran["n"] += 1
+            return "purged"
+
+    return Purge, ran
+
+
+async def _accept(context: Any, params: Any) -> mt.ElicitResult:
+    return mt.ElicitResult(action="accept", content={})
+
+
+async def _decline(context: Any, params: Any) -> mt.ElicitResult:
+    return mt.ElicitResult(action="decline")
+
+
+async def test_destructive_tool_runs_after_acceptance(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge), elicitation_callback=_accept, confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is False
+    assert ran["n"] == 1
+
+
+async def test_declined_destructive_tool_is_not_executed(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge), elicitation_callback=_decline, confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is True
+    assert result.meta["warpweft.error"] == "declined"
+    assert ran["n"] == 0
+
+
+async def test_destructive_confirmation_fails_closed_without_capability(connect) -> None:
+    Purge, ran = purge_component()
+    # no elicitation_callback -> the client does not advertise the capability
+    async with connect(app_with(Purge), confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is True
+    assert result.meta["warpweft.error"] == "confirmation_unsupported"
+    assert ran["n"] == 0
+
+
+async def test_destructive_tool_without_the_flag_runs_unprompted(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge)) as client:  # confirm_destructive defaults to off
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is False
+    assert ran["n"] == 1
+
+
+async def test_non_destructive_tool_is_never_confirmed(connect) -> None:
+    # confirm_destructive on, but the tool is not destructive and the client
+    # cannot elicit: the call must still go through.
+    async with connect(app_with(Search), confirm_destructive=True) as client:
+        result = await client.call_tool("search__query", {"text": "x"})
+    assert result.is_error is False

@@ -98,7 +98,7 @@ machine-readable guidance:
 
 | meta key | Meaning |
 | --- | --- |
-| `warpweft.error` | a stable code: `invalid_arguments`, `circuit_open`, `timeout`, `retry_exhausted`, `unavailable`, `transient`, `permanent`, `error` |
+| `warpweft.error` | a stable code: `invalid_arguments`, `circuit_open`, `timeout`, `retry_exhausted`, `unavailable`, `transient`, `permanent`, `error` - plus `declined` / `confirmation_unsupported` from the [destructive-tool gate](#confirming-destructive-tools) |
 | `warpweft.retryable` | whether calling again can help |
 | `warpweft.retry_after_s` | for `circuit_open`: seconds until the breaker admits a probe |
 | `warpweft.attempts` | for `retry_exhausted`: attempts already spent |
@@ -137,3 +137,21 @@ Cancellation needs no code at all: when the client cancels an MCP request,
 the SDK cancels the handler's anyio scope, the cancellation unwinds the
 policy chain, and the component's cleanup (`finally` blocks, context
 managers) runs as usual.
+
+## Confirming destructive tools
+
+```python
+build_server(app, confirm_destructive=True)
+```
+
+puts a human in the loop for every tool marked `destructive=True`: before
+executing, the server sends an MCP elicitation that the client presents to
+the user. Only an explicit accept runs the tool - decline or cancel returns a
+tool error (`warpweft.error: "declined"`) without executing anything. The
+gate fails closed: a client that does not support elicitation gets
+`confirmation_unsupported` instead of an unconfirmed execution. Confirmation
+happens after argument validation and never applies to non-destructive
+tools.
+
+Off by default - the `destructive` annotation alone only *hints* to the host
+UI; this flag turns it into an enforced contract.

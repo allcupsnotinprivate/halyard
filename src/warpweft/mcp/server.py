@@ -176,6 +176,37 @@ def _serialize(binding: ToolBinding, value: Any) -> Any:
     return binding.spec.output_adapter.dump_python(value, mode="json")
 
 
+_ELICITATION = mt.ClientCapabilities(elicitation=mt.ElicitationCapability())
+
+
+def _refusal(text: str, *, code: str) -> mt.CallToolResult:
+    meta = {"warpweft.error": code, "warpweft.retryable": False}
+    return mt.CallToolResult(content=[mt.TextContent(type="text", text=text)], is_error=True, meta=meta)
+
+
+async def _confirm_destructive(ctx: Any, binding: ToolBinding) -> mt.CallToolResult | None:
+    """Ask the user to confirm a destructive call; ``None`` means proceed.
+
+    Fails closed: when the operator demanded confirmation, a client that
+    cannot elicit gets an error, never an unconfirmed execution. The decision
+    is the elicitation ``action`` itself, so the form requests no fields.
+    """
+    if not ctx.session.check_client_capability(_ELICITATION):
+        return _refusal(
+            f"tool '{binding.name}' requires user confirmation, but the client does not support elicitation",
+            code="confirmation_unsupported",
+        )
+    label = binding.meta.title or binding.name
+    result = await ctx.session.elicit_form(
+        f"Confirm running '{label}'. This action is marked destructive.",
+        {"type": "object", "properties": {}},
+        related_request_id=ctx.request_id,
+    )
+    if result.action != "accept":
+        return _refusal(f"the user declined to run '{binding.name}'", code="declined")
+    return None
+
+
 def build_server(
     app: App,
     *,
@@ -184,6 +215,7 @@ def build_server(
     tags: Collection[str] | None = None,
     include: Collection[str] | None = None,
     exclude: Collection[str] | None = None,
+    confirm_destructive: bool = False,
 ) -> Server[Any]:
     """Wire an MCP server exposing the app's tools. The app must be started.
 
@@ -191,6 +223,10 @@ def build_server(
     `collect_tools`), so one app can back several servers with different
     tool sets - e.g. ``tags={"public"}`` for an assistant, no filter for an
     operator console.
+
+    ``confirm_destructive=True`` gates every ``destructive=True`` tool behind
+    an MCP elicitation: the user must accept before the call runs. Decline
+    (or a client that cannot elicit) is a tool error; the call never happens.
     """
     bindings = {b.name: b for b in collect_tools(app, tags=tags, include=include, exclude=exclude)}
     classes = {name: app.registry.get(name) for name in app.registry.names()}
@@ -212,6 +248,13 @@ def build_server(
         except ValidationError as exc:
             return error_result(exc)
         kwargs = {field: getattr(model, field) for field in type(model).model_fields}
+
+        # Confirmation comes after validation (no point confirming a call that
+        # would fail anyway) and before any execution.
+        if confirm_destructive and binding.meta.destructive:
+            denial = await _confirm_destructive(ctx, binding)
+            if denial is not None:
+                return denial
 
         async def forward_progress(progress: float, total: float | None, message: str | None) -> None:
             # Best-effort: a failed notification must never fail the call.
@@ -248,9 +291,18 @@ async def run_stdio(
     tags: Collection[str] | None = None,
     include: Collection[str] | None = None,
     exclude: Collection[str] | None = None,
+    confirm_destructive: bool = False,
 ) -> None:  # pragma: no cover - needs real stdio
     """Start the app and serve its tools over stdio until the stream closes."""
     async with app.run():
-        server = build_server(app, name=name, version=version, tags=tags, include=include, exclude=exclude)
+        server = build_server(
+            app,
+            name=name,
+            version=version,
+            tags=tags,
+            include=include,
+            exclude=exclude,
+            confirm_destructive=confirm_destructive,
+        )
         async with stdio_server() as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())
