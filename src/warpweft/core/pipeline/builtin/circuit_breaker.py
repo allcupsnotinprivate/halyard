@@ -104,12 +104,16 @@ class CircuitBreakerInterceptor:
         """Decide whether this call may proceed; may flip open -> half-open."""
         async with self._lock:
             if self._state is CircuitState.OPEN:
-                if self._clock.monotonic() - self._opened_at >= self._settings.reset_timeout:
+                elapsed = self._clock.monotonic() - self._opened_at
+                if elapsed >= self._settings.reset_timeout:
                     self._state = CircuitState.HALF_OPEN
                     self._probe_in_flight = True  # this call is the probe
                     return
                 observer_of(ctx).event(EVENT_BREAKER_REJECTED, {ATTR_BREAKER_STATE: "open"})
-                raise CircuitOpen(f"circuit for '{ctx.operation}' is open")
+                raise CircuitOpen(
+                    f"circuit for '{ctx.operation}' is open",
+                    retry_after=self._settings.reset_timeout - elapsed,
+                )
             if self._state is CircuitState.HALF_OPEN:
                 if self._probe_in_flight:
                     observer_of(ctx).event(EVENT_BREAKER_REJECTED, {ATTR_BREAKER_STATE: "half_open"})

@@ -87,6 +87,23 @@ A tool call returns the invocable's `Outcome`, serialized against the output
 schema in JSON mode - so `SecretStr` fields are masked and enums/dates become
 primitives. The result is returned as text content, plus `structuredContent`
 when the value is an object; the `Outcome`'s `source` and `degraded` are
-reported in the result `meta`. A `FrameworkError` (e.g. a `PermanentError`, or a
-tripped breaker after retries) becomes a tool error (`isError=true`) with the
-message, not a transport-level failure.
+reported in the result `meta`.
+
+## Errors
+
+Any failure - framework or user code - becomes a tool error (`isError=true`),
+never a transport-level failure. The error tells the model what to do next: a
+one-sentence hint is appended to the message, and the result `meta` carries
+machine-readable guidance:
+
+| meta key | Meaning |
+| --- | --- |
+| `warpweft.error` | a stable code: `invalid_arguments`, `circuit_open`, `timeout`, `retry_exhausted`, `unavailable`, `transient`, `permanent`, `error` |
+| `warpweft.retryable` | whether calling again can help |
+| `warpweft.retry_after_s` | for `circuit_open`: seconds until the breaker admits a probe |
+| `warpweft.attempts` | for `retry_exhausted`: attempts already spent |
+
+The codes mirror the [error taxonomy](composition.md): transient failures
+(timeouts, an open breaker, a degraded component) are retryable, permanent
+ones are not, and an unclassified exception is reported as non-retryable
+`error` - the same stance the retry link takes.

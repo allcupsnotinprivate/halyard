@@ -7,9 +7,18 @@ import pytest
 
 from warpweft.core.component import AComponent, EmptySettings, invocable
 from warpweft.core.composition import Registry
-from warpweft.core.errors import FrameworkError, PermanentError, TransientError
+from warpweft.core.errors import (
+    CircuitOpen,
+    ComponentUnavailable,
+    DeadlineExceeded,
+    FrameworkError,
+    PermanentError,
+    RetryExhausted,
+    TransientError,
+)
 from warpweft.core.formats import Ipv4
 from warpweft.mcp import collect_tools, tool
+from warpweft.mcp.errors import error_result
 from warpweft.runtime import App
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -194,6 +203,25 @@ async def test_permanent_error_becomes_a_tool_error(connect) -> None:
         result = await client.call_tool("boom__go", {})
     assert result.is_error is True
     assert "bad request" in result.content[0].text
+    assert result.meta["warpweft.error"] == "permanent"
+    assert result.meta["warpweft.retryable"] is False
+
+
+async def test_unexpected_exception_becomes_a_tool_error(connect) -> None:
+    class Oops(AComponent[EmptySettings, None, str]):
+        name = "oops"
+
+        @tool
+        @invocable
+        async def go(self) -> str:
+            raise ValueError("not a framework error")
+
+    async with connect(app_with(Oops)) as client:
+        result = await client.call_tool("oops__go", {})
+    assert result.is_error is True
+    assert "not a framework error" in result.content[0].text
+    assert result.meta["warpweft.error"] == "error"
+    assert result.meta["warpweft.retryable"] is False
 
 
 class Geo(AComponent[EmptySettings, str, dict]):
@@ -332,3 +360,43 @@ async def test_served_tool_set_respects_the_tag_filter(connect) -> None:
     async with connect(app_with(Billing, Search), tags={"public"}) as client:
         result = await client.list_tools()
     assert [t.name for t in result.tools] == ["billing__invoice", "billing__payments"]
+
+
+# --- error mapping ------------------------------------------------------------
+
+
+def test_error_results_carry_retry_guidance() -> None:
+    cases = [
+        (PermanentError("bad key"), "permanent", False),
+        (TransientError("blip"), "transient", True),
+        (DeadlineExceeded("out of time"), "timeout", True),
+        (ComponentUnavailable("weather is degraded"), "unavailable", True),
+        (ValueError("bug"), "error", False),
+    ]
+    for exc, code, retryable in cases:
+        result = error_result(exc)
+        assert result.is_error is True
+        assert result.meta["warpweft.error"] == code
+        assert result.meta["warpweft.retryable"] is retryable
+        assert str(exc) in result.content[0].text
+
+
+def test_circuit_open_reports_retry_after() -> None:
+    result = error_result(CircuitOpen("circuit for 'op' is open", retry_after=4.2))
+    assert result.meta["warpweft.error"] == "circuit_open"
+    assert result.meta["warpweft.retry_after_s"] == 4.2
+    assert "4.2" in result.content[0].text  # the hint names the wait
+
+
+def test_retry_exhausted_reports_attempts() -> None:
+    err = RetryExhausted("gave up", attempts=3, last_error=TransientError("blip"))
+    result = error_result(err)
+    assert result.meta["warpweft.error"] == "retry_exhausted"
+    assert result.meta["warpweft.attempts"] == 3
+
+
+async def test_validation_error_meta_marks_invalid_arguments(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.call_tool("geo__locate", {"host": "not-an-ip"})
+    assert result.meta["warpweft.error"] == "invalid_arguments"
+    assert result.meta["warpweft.retryable"] is True

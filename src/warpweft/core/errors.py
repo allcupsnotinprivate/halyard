@@ -48,6 +48,11 @@ class CircuitOpen(TransientError):
     try again once the breaker allows a probe.
     """
 
+    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        #: Seconds until the breaker will admit a probe, when known.
+        self.retry_after = retry_after
+
 
 class RetryExhausted(TransientError):
     """Every retry attempt was spent; wraps the last underlying failure.

@@ -27,6 +27,7 @@ from warpweft.core.component import InvocableSpec, describe
 from warpweft.core.errors import FrameworkError
 from warpweft.runtime import App
 
+from .errors import error_result
 from .schema import tool_input_schema
 from .tool import ToolMeta, is_tool, tool_meta
 
@@ -207,12 +208,15 @@ def build_server(
         try:
             model = binding.spec.input_model.model_validate(params.arguments or {})
         except ValidationError as exc:
-            return mt.CallToolResult(content=[mt.TextContent(type="text", text=str(exc))], is_error=True)
+            return error_result(exc)
         kwargs = {field: getattr(model, field) for field in type(model).model_fields}
+        # Any failure - framework or user code - becomes a tool error with retry
+        # guidance, never a transport-level failure. Cancellation (a
+        # BaseException) still propagates.
         try:
             outcome = await app.container.invoke(binding.component, binding.method, **kwargs)
-        except FrameworkError as exc:
-            return mt.CallToolResult(content=[mt.TextContent(type="text", text=str(exc))], is_error=True)
+        except Exception as exc:
+            return error_result(exc)
 
         serialized = _serialize(binding, outcome.value)
         text = serialized if isinstance(serialized, str) else json.dumps(serialized)
