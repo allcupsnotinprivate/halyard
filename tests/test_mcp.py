@@ -154,11 +154,37 @@ async def test_object_return_advertises_output_schema(connect) -> None:
     assert tool_def.output_schema["type"] == "object"
 
 
-async def test_non_object_return_has_no_output_schema(connect) -> None:
+async def test_non_object_return_advertises_a_wrapped_schema(connect) -> None:
     async with connect(app_with(Search)) as client:
         result = await client.list_tools()
-    (tool_def,) = result.tools  # returns a list -> no object output schema
-    assert tool_def.output_schema is None
+    (tool_def,) = result.tools  # returns a list -> wrapped in {"result": ...}
+    schema = tool_def.output_schema
+    assert schema is not None
+    assert schema["type"] == "object"
+    assert schema["required"] == ["result"]
+    assert schema["properties"]["result"]["type"] == "array"
+    assert "Doc" in schema["$defs"]  # hoisted so nested $refs stay valid
+
+
+async def test_non_object_call_returns_wrapped_structured_content(connect) -> None:
+    async with connect(app_with(Search)) as client:
+        result = await client.call_tool("search__query", {"text": "sre"})
+    assert result.structured_content == {"result": [{"id": "sre-0", "score": 1.0}]}
+
+
+async def test_scalar_call_returns_wrapped_structured_content(connect) -> None:
+    class Echo(AComponent[EmptySettings, None, str]):
+        name = "echo"
+
+        @tool
+        @invocable
+        async def say(self) -> str:
+            return "ok"
+
+    async with connect(app_with(Echo)) as client:
+        result = await client.call_tool("echo__say", {})
+    assert result.structured_content == {"result": "ok"}
+    assert result.content[0].text == "ok"  # the text stays raw, not the wrapper
 
 
 # --- call_tool ---------------------------------------------------------------

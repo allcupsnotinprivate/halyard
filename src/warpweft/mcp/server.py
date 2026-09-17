@@ -157,17 +157,35 @@ def _annotations(meta: ToolMeta) -> mt.ToolAnnotations | None:
     return mt.ToolAnnotations(**present) if present else None
 
 
+def _output_contract(binding: ToolBinding) -> tuple[dict[str, Any], bool]:
+    """The advertised output schema, and whether values get result-wrapped.
+
+    MCP output schemas must be object schemas. A non-object return is wrapped
+    in ``{"result": ...}`` so every tool advertises a schema and returns
+    structured content. ``$defs`` are hoisted to the wrapper root so ``$ref``
+    pointers inside the nested schema stay valid.
+    """
+    schema = binding.spec.output_json_schema()
+    if schema.get("type") == "object":
+        return schema, False
+    inner = dict(schema)
+    defs = inner.pop("$defs", None)
+    wrapper: dict[str, Any] = {"type": "object", "properties": {"result": inner}, "required": ["result"]}
+    if defs:
+        wrapper["$defs"] = defs
+    return wrapper, True
+
+
 def _describe_tool(cls: type, binding: ToolBinding) -> mt.Tool:
     method = getattr(cls, binding.method)
     description = binding.meta.description or (inspect.getdoc(method) or None)
-    output_schema = binding.spec.output_json_schema()
+    output_schema, _ = _output_contract(binding)
     return mt.Tool(
         name=binding.name,
         title=binding.meta.title,
         description=description,
         input_schema=tool_input_schema(binding.spec.input_model),
-        # MCP output schemas must be object schemas; advertise only then.
-        output_schema=output_schema if output_schema.get("type") == "object" else None,
+        output_schema=output_schema,
         annotations=_annotations(binding.meta),
     )
 
@@ -273,10 +291,14 @@ def build_server(
             return error_result(exc)
 
         serialized = _serialize(binding, outcome.value)
+        # Text stays the raw serialization (readable for humans); the wrap
+        # decision follows the advertised schema, not the runtime value, so
+        # structured content always conforms to the output schema.
         text = serialized if isinstance(serialized, str) else json.dumps(serialized)
+        _, wrapped = _output_contract(binding)
         return mt.CallToolResult(
             content=[mt.TextContent(type="text", text=text)],
-            structured_content=serialized if isinstance(serialized, dict) else None,
+            structured_content={"result": serialized} if wrapped else serialized,
             meta={"warpweft.source": outcome.source, "warpweft.degraded": outcome.degraded},
         )
 

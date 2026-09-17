@@ -77,16 +77,19 @@ Per tool, derived from the invocable's descriptor:
   field format (`warpweft.formats`, e.g. `host: Ipv4`) carry the `format`
   keyword, and the arguments an LLM supplies are validated against the input
   model before the call - an invalid value comes back as a tool error.
-- **outputSchema** - the return type's JSON Schema, advertised only when it is
-  an object (per the MCP spec).
+- **outputSchema** - the return type's JSON Schema. MCP requires an object
+  schema, so a non-object return (`str`, `list[Doc]`, ...) is advertised
+  wrapped: `{"result": <schema>}`. Every tool has an output schema.
 - **annotations** - the hint flags above.
 
 ## Results
 
 A tool call returns the invocable's `Outcome`, serialized against the output
 schema in JSON mode - so `SecretStr` fields are masked and enums/dates become
-primitives. The result is returned as text content, plus `structuredContent`
-when the value is an object; the `Outcome`'s `source` and `degraded` are
+primitives. Every call returns `structuredContent` conforming to the
+advertised schema - a non-object value arrives as `{"result": ...}` - plus a
+text content block that stays the *raw* serialization (a `str` result reads
+as plain text, not JSON). The `Outcome`'s `source` and `degraded` are
 reported in the result `meta`.
 
 ## Errors
