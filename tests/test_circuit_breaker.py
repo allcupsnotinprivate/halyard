@@ -87,6 +87,20 @@ async def test_open_rejects_without_calling_next() -> None:
     assert probe.calls == 0  # the call never reached the base
 
 
+async def test_open_rejection_reports_time_until_probe() -> None:
+    clock = ManualClock()
+    cb = breaker(clock, window=2, failure_threshold=2, reset_timeout=10.0)
+    fail = Call("transient")
+    for _ in range(2):
+        with pytest.raises(TransientError):
+            await cb.call(fail, ctx())
+
+    clock.advance(4.0)
+    with pytest.raises(CircuitOpen) as info:
+        await cb.call(Call("ok"), ctx())
+    assert info.value.retry_after == pytest.approx(6.0)
+
+
 async def test_permanent_errors_do_not_open_the_breaker() -> None:
     cb = breaker(ManualClock(), window=3, failure_threshold=2)
     call = Call("permanent")

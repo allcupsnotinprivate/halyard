@@ -72,6 +72,7 @@ The metadata comes from class attributes:
 | `tool_name` | override the derived `<component>__execute` name |
 | `title` | human-friendly title |
 | `read_only`, `destructive`, `idempotent`, `open_world` | MCP behaviour hints |
+| `tags` | labels for [tool filtering](mcp.md#filtering) when a server is built |
 
 Set `entrypoint = False` on an action to keep it internal (registered and
 callable, but never a tool).

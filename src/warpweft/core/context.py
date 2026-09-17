@@ -9,7 +9,7 @@ agree on (deadline, attempt number, shared facts) travels in the context.
     shared. Pass the context explicitly when crossing thread boundaries.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -133,3 +133,36 @@ def use_correlation_id(correlation_id: str) -> Iterator[str]:
         yield correlation_id
     finally:
         _correlation_id.reset(token)
+
+
+#: Where progress reports go: an async ``(progress, total, message)`` callable.
+ProgressSink = Callable[[float, "float | None", "str | None"], Awaitable[None]]
+
+_progress_sink: ContextVar[ProgressSink | None] = ContextVar("warpweft_progress_sink", default=None)
+
+
+@contextmanager
+def use_progress_sink(sink: ProgressSink) -> Iterator[ProgressSink]:
+    """Install a progress sink for the duration of the block.
+
+    A *transport* (an MCP server, an HTTP handler) sets this around an
+    invocation so `report_progress` calls made inside reach the caller.
+    Component code never installs a sink - it only reports.
+    """
+    token = _progress_sink.set(sink)
+    try:
+        yield sink
+    finally:
+        _progress_sink.reset(token)
+
+
+async def report_progress(progress: float, total: float | None = None, message: str | None = None) -> None:
+    """Report progress of the current invocation to whoever is listening.
+
+    Call this from a long-running invocable; it is a no-op unless the
+    transport driving the call installed a sink (see `use_progress_sink`),
+    so components stay transport-agnostic.
+    """
+    sink = _progress_sink.get()
+    if sink is not None:
+        await sink(progress, total, message)

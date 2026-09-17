@@ -175,6 +175,18 @@ def test_action_is_exposed_as_a_tool_by_default() -> None:
     assert (binding.name, binding.component, binding.method) == ("summarize__execute", "summarize", "execute")
 
 
+def test_action_class_tags_reach_the_tool_filter() -> None:
+    class Audit(Action[EmptySettings, Ping, int]):
+        tags = {"admin"}
+
+        async def execute(self, params: Ping) -> int:
+            return params.value
+
+    (binding,) = collect_tools(app_with(Audit, Summarize), tags={"admin"})
+    assert binding.component == "audit"
+    assert binding.meta.tags == frozenset({"admin"})
+
+
 def test_action_can_opt_out_of_exposure() -> None:
     class Hidden(Action[EmptySettings, Ping, int]):
         entrypoint = False

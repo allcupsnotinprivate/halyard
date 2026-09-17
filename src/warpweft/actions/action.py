@@ -22,7 +22,7 @@ actions carry tool metadata whether or not the ``mcp`` extra is installed; the
 optional `warpweft.mcp` layer collects them when a server is built.
 """
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Collection, Mapping
 import inspect
 from typing import Any, ClassVar, TypeVar, cast, get_type_hints
 
@@ -104,6 +104,8 @@ class Action(AComponent[TSettings, TIn, TOut]):
     destructive: ClassVar[bool | None] = None
     idempotent: ClassVar[bool | None] = None
     open_world: ClassVar[bool | None] = None
+    #: Tool tags, for serving different tool sets from one app.
+    tags: ClassVar[Collection[str] | None] = None
 
     _invoker: Callable[..., Awaitable[Outcome[Any]]] | None = None
 
@@ -124,6 +126,7 @@ class Action(AComponent[TSettings, TIn, TOut]):
                 destructive=cls.destructive,
                 idempotent=cls.idempotent,
                 open_world=cls.open_world,
+                tags=cls.tags,
             )(execute)
 
     async def execute(self, params: TIn) -> TOut:

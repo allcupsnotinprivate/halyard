@@ -2,14 +2,26 @@
 
 from typing import Any
 
+import anyio
+import mcp.types as mt
 from pydantic import BaseModel, SecretStr
 import pytest
 
 from warpweft.core.component import AComponent, EmptySettings, invocable
 from warpweft.core.composition import Registry
-from warpweft.core.errors import FrameworkError, PermanentError, TransientError
+from warpweft.core.context import report_progress
+from warpweft.core.errors import (
+    CircuitOpen,
+    ComponentUnavailable,
+    DeadlineExceeded,
+    FrameworkError,
+    PermanentError,
+    RetryExhausted,
+    TransientError,
+)
 from warpweft.core.formats import Ipv4
 from warpweft.mcp import collect_tools, tool
+from warpweft.mcp.errors import error_result
 from warpweft.runtime import App
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -142,11 +154,37 @@ async def test_object_return_advertises_output_schema(connect) -> None:
     assert tool_def.output_schema["type"] == "object"
 
 
-async def test_non_object_return_has_no_output_schema(connect) -> None:
+async def test_non_object_return_advertises_a_wrapped_schema(connect) -> None:
     async with connect(app_with(Search)) as client:
         result = await client.list_tools()
-    (tool_def,) = result.tools  # returns a list -> no object output schema
-    assert tool_def.output_schema is None
+    (tool_def,) = result.tools  # returns a list -> wrapped in {"result": ...}
+    schema = tool_def.output_schema
+    assert schema is not None
+    assert schema["type"] == "object"
+    assert schema["required"] == ["result"]
+    assert schema["properties"]["result"]["type"] == "array"
+    assert "Doc" in schema["$defs"]  # hoisted so nested $refs stay valid
+
+
+async def test_non_object_call_returns_wrapped_structured_content(connect) -> None:
+    async with connect(app_with(Search)) as client:
+        result = await client.call_tool("search__query", {"text": "sre"})
+    assert result.structured_content == {"result": [{"id": "sre-0", "score": 1.0}]}
+
+
+async def test_scalar_call_returns_wrapped_structured_content(connect) -> None:
+    class Echo(AComponent[EmptySettings, None, str]):
+        name = "echo"
+
+        @tool
+        @invocable
+        async def say(self) -> str:
+            return "ok"
+
+    async with connect(app_with(Echo)) as client:
+        result = await client.call_tool("echo__say", {})
+    assert result.structured_content == {"result": "ok"}
+    assert result.content[0].text == "ok"  # the text stays raw, not the wrapper
 
 
 # --- call_tool ---------------------------------------------------------------
@@ -194,6 +232,25 @@ async def test_permanent_error_becomes_a_tool_error(connect) -> None:
         result = await client.call_tool("boom__go", {})
     assert result.is_error is True
     assert "bad request" in result.content[0].text
+    assert result.meta["warpweft.error"] == "permanent"
+    assert result.meta["warpweft.retryable"] is False
+
+
+async def test_unexpected_exception_becomes_a_tool_error(connect) -> None:
+    class Oops(AComponent[EmptySettings, None, str]):
+        name = "oops"
+
+        @tool
+        @invocable
+        async def go(self) -> str:
+            raise ValueError("not a framework error")
+
+    async with connect(app_with(Oops)) as client:
+        result = await client.call_tool("oops__go", {})
+    assert result.is_error is True
+    assert "not a framework error" in result.content[0].text
+    assert result.meta["warpweft.error"] == "error"
+    assert result.meta["warpweft.retryable"] is False
 
 
 class Geo(AComponent[EmptySettings, str, dict]):
@@ -257,3 +314,259 @@ async def test_call_runs_through_the_policy_chain(connect) -> None:
         result = await client.call_tool("flaky__fetch", {})
     assert result.is_error is False
     assert calls["n"] == 3  # retry ran under the tool call
+
+
+# --- filtering ----------------------------------------------------------------
+
+
+class Billing(AComponent[EmptySettings, str, dict]):
+    name = "billing"
+
+    @tool(description="Show an invoice.", read_only=True, tags={"public"})
+    @invocable
+    async def invoice(self, invoice_id: str) -> dict[str, str]:
+        return {"invoice": invoice_id}
+
+    @tool(description="List payments.", read_only=True, tags={"public", "admin"})
+    @invocable
+    async def payments(self) -> dict[str, str]:
+        return {"payments": "[]"}
+
+    @tool(description="Refund a payment.", destructive=True, tags={"admin"})
+    @invocable
+    async def refund(self, payment_id: str) -> dict[str, str]:
+        return {"refunded": payment_id}
+
+
+def _names(bindings: list[Any]) -> list[str]:
+    return [b.name for b in bindings]
+
+
+def test_no_filter_keeps_every_tool() -> None:
+    bindings = collect_tools(app_with(Billing, Search))
+    assert _names(bindings) == ["billing__invoice", "billing__payments", "billing__refund", "search__query"]
+
+
+def test_tags_filter_keeps_tools_with_any_requested_tag() -> None:
+    bindings = collect_tools(app_with(Billing), tags={"public"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments"]
+
+
+def test_untagged_tool_never_passes_a_tag_filter() -> None:
+    # Search.query declares no tags, so a tag filter works as a whitelist.
+    bindings = collect_tools(app_with(Billing, Search), tags={"public", "admin"})
+    assert "search__query" not in _names(bindings)
+
+
+def test_include_supports_globs() -> None:
+    bindings = collect_tools(app_with(Billing, Search), include={"billing__*"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments", "billing__refund"]
+
+
+def test_exclude_wins_over_include() -> None:
+    bindings = collect_tools(app_with(Billing), include={"billing__*"}, exclude={"billing__refund"})
+    assert _names(bindings) == ["billing__invoice", "billing__payments"]
+
+
+def test_unknown_tag_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="no tool declares tag"):
+        collect_tools(app_with(Billing), tags={"ops"})
+
+
+def test_pattern_matching_no_tool_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="include pattern .* matches no tool"):
+        collect_tools(app_with(Billing), include={"billng__*"})
+    with pytest.raises(FrameworkError, match="exclude pattern .* matches no tool"):
+        collect_tools(app_with(Billing), exclude={"billing__ghost"})
+
+
+def test_filter_leaving_no_tools_is_rejected() -> None:
+    with pytest.raises(FrameworkError, match="leaves no tools"):
+        collect_tools(app_with(Billing), tags={"admin"}, exclude={"billing__payments", "billing__refund"})
+
+
+async def test_served_tool_set_respects_the_tag_filter(connect) -> None:
+    async with connect(app_with(Billing, Search), tags={"public"}) as client:
+        result = await client.list_tools()
+    assert [t.name for t in result.tools] == ["billing__invoice", "billing__payments"]
+
+
+# --- error mapping ------------------------------------------------------------
+
+
+def test_error_results_carry_retry_guidance() -> None:
+    cases = [
+        (PermanentError("bad key"), "permanent", False),
+        (TransientError("blip"), "transient", True),
+        (DeadlineExceeded("out of time"), "timeout", True),
+        (ComponentUnavailable("weather is degraded"), "unavailable", True),
+        (ValueError("bug"), "error", False),
+    ]
+    for exc, code, retryable in cases:
+        result = error_result(exc)
+        assert result.is_error is True
+        assert result.meta["warpweft.error"] == code
+        assert result.meta["warpweft.retryable"] is retryable
+        assert str(exc) in result.content[0].text
+
+
+def test_circuit_open_reports_retry_after() -> None:
+    result = error_result(CircuitOpen("circuit for 'op' is open", retry_after=4.2))
+    assert result.meta["warpweft.error"] == "circuit_open"
+    assert result.meta["warpweft.retry_after_s"] == 4.2
+    assert "4.2" in result.content[0].text  # the hint names the wait
+
+
+def test_retry_exhausted_reports_attempts() -> None:
+    err = RetryExhausted("gave up", attempts=3, last_error=TransientError("blip"))
+    result = error_result(err)
+    assert result.meta["warpweft.error"] == "retry_exhausted"
+    assert result.meta["warpweft.attempts"] == 3
+
+
+async def test_validation_error_meta_marks_invalid_arguments(connect) -> None:
+    async with connect(app_with(Geo)) as client:
+        result = await client.call_tool("geo__locate", {"host": "not-an-ip"})
+    assert result.meta["warpweft.error"] == "invalid_arguments"
+    assert result.meta["warpweft.retryable"] is True
+
+
+# --- progress & cancellation ---------------------------------------------------
+
+
+async def test_progress_reports_reach_the_client(connect) -> None:
+    class Cruncher(AComponent[EmptySettings, None, str]):
+        name = "cruncher"
+
+        @tool
+        @invocable
+        async def crunch(self) -> str:
+            await report_progress(0.5, total=1.0, message="halfway")
+            await report_progress(1.0, total=1.0, message="done")
+            return "ok"
+
+    seen: list[tuple[float, float | None, str | None]] = []
+
+    async def on_progress(progress: float, total: float | None, message: str | None) -> None:
+        seen.append((progress, total, message))
+
+    async with connect(app_with(Cruncher)) as client:
+        result = await client.call_tool("cruncher__crunch", {}, progress_callback=on_progress)
+    assert result.is_error is False
+    assert seen == [(0.5, 1.0, "halfway"), (1.0, 1.0, "done")]
+
+
+async def test_progress_without_a_client_token_is_dropped(connect) -> None:
+    class Quiet(AComponent[EmptySettings, None, str]):
+        name = "quiet"
+
+        @tool
+        @invocable
+        async def crunch(self) -> str:
+            await report_progress(0.5)  # no token -> the session no-ops
+            return "ok"
+
+    async with connect(app_with(Quiet)) as client:
+        result = await client.call_tool("quiet__crunch", {})
+    assert result.is_error is False
+
+
+async def test_client_cancellation_reaches_the_invocable(connect) -> None:
+    started = anyio.Event()
+    cancelled = anyio.Event()
+
+    class Slow(AComponent[EmptySettings, None, str]):
+        name = "slow"
+
+        @tool
+        @invocable
+        async def wait(self) -> str:
+            started.set()
+            try:
+                await anyio.sleep(60)
+            except anyio.get_cancelled_exc_class():
+                cancelled.set()
+                raise
+            return "never"
+
+    async with connect(app_with(Slow)) as client:
+        async with anyio.create_task_group() as tg:
+
+            async def call() -> None:
+                await client.call_tool("slow__wait", {})
+
+            tg.start_soon(call)
+            await started.wait()
+            tg.cancel_scope.cancel()  # abandoning the request sends notifications/cancelled
+
+        with anyio.fail_after(2):
+            await cancelled.wait()  # the SDK interrupted the handler's scope
+
+
+# --- destructive confirmation ---------------------------------------------------
+
+
+def purge_component() -> tuple[type[AComponent[Any, Any, Any]], dict[str, int]]:
+    ran = {"n": 0}
+
+    class Purge(AComponent[EmptySettings, None, str]):
+        name = "purge"
+
+        @tool(description="Drop everything.", destructive=True)
+        @invocable
+        async def run(self) -> str:
+            ran["n"] += 1
+            return "purged"
+
+    return Purge, ran
+
+
+async def _accept(context: Any, params: Any) -> mt.ElicitResult:
+    return mt.ElicitResult(action="accept", content={})
+
+
+async def _decline(context: Any, params: Any) -> mt.ElicitResult:
+    return mt.ElicitResult(action="decline")
+
+
+async def test_destructive_tool_runs_after_acceptance(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge), elicitation_callback=_accept, confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is False
+    assert ran["n"] == 1
+
+
+async def test_declined_destructive_tool_is_not_executed(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge), elicitation_callback=_decline, confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is True
+    assert result.meta["warpweft.error"] == "declined"
+    assert ran["n"] == 0
+
+
+async def test_destructive_confirmation_fails_closed_without_capability(connect) -> None:
+    Purge, ran = purge_component()
+    # no elicitation_callback -> the client does not advertise the capability
+    async with connect(app_with(Purge), confirm_destructive=True) as client:
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is True
+    assert result.meta["warpweft.error"] == "confirmation_unsupported"
+    assert ran["n"] == 0
+
+
+async def test_destructive_tool_without_the_flag_runs_unprompted(connect) -> None:
+    Purge, ran = purge_component()
+    async with connect(app_with(Purge)) as client:  # confirm_destructive defaults to off
+        result = await client.call_tool("purge__run", {})
+    assert result.is_error is False
+    assert ran["n"] == 1
+
+
+async def test_non_destructive_tool_is_never_confirmed(connect) -> None:
+    # confirm_destructive on, but the tool is not destructive and the client
+    # cannot elicit: the call must still go through.
+    async with connect(app_with(Search), confirm_destructive=True) as client:
+        result = await client.call_tool("search__query", {"text": "x"})
+    assert result.is_error is False

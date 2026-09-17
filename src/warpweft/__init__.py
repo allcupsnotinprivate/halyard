@@ -32,6 +32,7 @@ from warpweft.core.composition import Container, Readiness, Registry, SettingsRe
 from warpweft.core.context import (
     InvocationContext,
     current_correlation_id,
+    report_progress,
     use_correlation_id,
 )
 from warpweft.core.errors import (
@@ -101,5 +102,6 @@ __all__ = [
     "default_registry",
     "describe",
     "invocable",
+    "report_progress",
     "use_correlation_id",
 ]
